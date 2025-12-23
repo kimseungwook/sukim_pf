@@ -1,0 +1,395 @@
+global:
+  nodeSelector:
+    cpu-type: arm64
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: cpu-type
+            operator: In
+            values:
+            - arm64
+          - key: workload-type
+            operator: NotIn
+            values:
+            - build
+
+prometheusOperator:
+  nodeSelector:
+    cpu-type: arm64
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: cpu-type
+            operator: In
+            values:
+            - arm64
+          - key: workload-type
+            operator: NotIn
+            values:
+            - build
+  admissionWebhooks:
+    patch:
+      nodeSelector:
+        cpu-type: arm64
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: service
+                operator: In
+                values:
+                - monitoring
+              - key: workload-type
+                operator: NotIn
+                values:
+                - build
+
+prometheus:
+  enabled: true
+  prometheusSpec:
+    image:
+      registry: quay.io
+      repository: prometheus/prometheus
+      tag: v3.0.1
+    
+    # [핵심] Grafana 대시보드가 데이터를 찾을 수 있게 라벨 추가
+    externalLabels:
+      origin_prometheus: "goyo-dev"
+
+    # [핵심] Mimir로 메트릭 전송 (에러 방지 설정 포함)
+    remoteWrite:
+      - url: "http://goyo-mimir-distributed-gateway.lgtm.svc.cluster.local:80/api/v1/push"
+        headers:
+          X-Scope-OrgID: "1"
+        # [중요] Mimir가 거부하는 '점(.) 포함 메트릭' 필터링 (400 에러 해결)
+        writeRelabelConfigs:
+          - sourceLabels: [__name__]
+            regex: ".*\\..*"
+            action: drop
+          # 2. http.method 라벨 삭제 (라벨 이름 변경이 복잡하면 그냥 지우는 게 안전)
+          - regex: "http\\.method"
+            action: labeldrop
+            
+          # 3. http.url 라벨 삭제
+          - regex: "http\\.url"
+            action: labeldrop
+          
+    enableRemoteWriteReceiver: true
+    logLevel: debug
+    retention: 10d
+    scrapeInterval: 30s
+    scrapeTimeout: 30s
+    evaluationInterval: 30s
+    
+    resources:
+      requests:
+        memory: 1Gi
+        cpu: 500m
+      limits:
+        memory: 2Gi
+        cpu: 1000m
+
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: oci-bv
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+
+    nodeSelector:
+      cpu-type: arm64
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: service
+              operator: In
+              values:
+              - monitoring
+            - key: workload-type
+              operator: NotIn
+              values:
+              - build
+
+    securityContext:
+      runAsGroup: 2000
+      runAsNonRoot: true
+      runAsUser: 1000
+      fsGroup: 2000
+      seccompProfile:
+        type: RuntimeDefault
+
+    podAntiAffinity: ""
+
+  serviceAccount:
+    create: true
+    name: ""
+    automountServiceAccountToken: true
+
+  service:
+    type: ClusterIP
+    port: 9090
+    targetPort: 9090
+
+  serviceMonitor:
+    selfMonitor: true
+    interval: ""
+    additionalLabels: {}
+
+  ingress:
+    enabled: false
+
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    externalUrl: http://goyo-grafana.lgtm.svc.cluster.local:80
+    resources:
+      requests:
+        memory: 200Mi
+        cpu: 100m
+      limits:
+        memory: 400Mi
+        cpu: 200m
+    nodeSelector:
+      cpu-type: arm64
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: service
+              operator: In
+              values:
+              - monitoring
+            - key: workload-type
+              operator: NotIn
+              values:
+              - build
+
+    securityContext:
+      runAsGroup: 2000
+      runAsNonRoot: true
+      runAsUser: 1000
+      fsGroup: 2000
+      seccompProfile:
+        type: RuntimeDefault
+    podAntiAffinity: ""
+
+  serviceAccount:
+    create: true
+    name: ""
+    automountServiceAccountToken: true
+
+  service:
+    type: ClusterIP
+    port: 9093
+    targetPort: 9093
+
+grafana:
+  enabled: false
+
+nodeExporter:
+  enabled: true
+
+prometheus-node-exporter:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: cpu-type
+            operator: NotIn
+            values:
+            - virtual
+          - key: workload-type
+            operator: NotIn
+            values:
+            - build
+    
+  extraArgs:
+    - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/.+)($|/)
+    - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|erofs)$
+
+  service:
+    portName: http-metrics
+    labels:
+      jobLabel: node-exporter
+
+  prometheus:
+    monitor:
+      enabled: true
+      jobLabel: jobLabel
+      interval: ""
+      relabelings: []
+      metricRelabelings: []
+
+  resources:
+    requests:
+      memory: 50Mi
+      cpu: 100m
+    limits:
+      memory: 100Mi
+      cpu: 200m
+
+kube-state-metrics:
+  nodeSelector:
+    cpu-type: arm64
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: cpu-type
+            operator: In
+            values:
+            - arm64
+          - key: workload-type
+            operator: NotIn
+            values:
+            - build
+  extraArgs:
+    - --metric-labels-allowlist=nodes=[cpu-type,kubernetes.io/hostname,service,node-type]
+  releaseLabel: true
+  prometheus:
+    monitor:
+      enabled: true
+      http:
+        honorLabels: true
+      metrics:
+        honorLabels: true
+
+kubelet:
+  enabled: true
+  namespace: kube-system
+  serviceMonitor:
+    enabled: true
+    relabelings:
+      - action: replace
+        sourceLabels: [__metrics_path__]
+        targetLabel: metrics_path
+      - sourceLabels: [__meta_kubernetes_node_label_goyo_svc]
+        regex: virtual
+        action: drop
+      - sourceLabels: [__meta_kubernetes_node_label_service]
+        regex: virtual
+        action: drop
+    cAdvisor: true
+    cAdvisorInterval: 30s
+    cAdvisorRelabelings:
+      - action: replace
+        sourceLabels: [__metrics_path__]
+        targetLabel: metrics_path
+    cAdvisorMetricRelabelings:
+      - sourceLabels: [__name__]
+        action: drop
+        regex: 'container_cpu_(cfs_throttled_seconds_total|load_average_10s|system_seconds_total|user_seconds_total)'
+      - sourceLabels: [__name__]
+        action: drop
+        regex: 'container_fs_(io_current|io_time_seconds_total|io_time_weighted_seconds_total|reads_merged_total|sector_reads_total|sector_writes_total|writes_merged_total)'
+      - sourceLabels: [__name__]
+        action: drop
+        regex: 'container_memory_(mapped_file|swap)'
+      - sourceLabels: [__name__]
+        action: drop
+        regex: 'container_(file_descriptors|tasks_state|threads_max)'
+      - sourceLabels: [__name__, scope]
+        action: drop
+        regex: 'container_memory_failures_total;hierarchy'
+      - sourceLabels: [__name__, interface]
+        action: drop
+        regex: 'container_network_.*;(cali|cilium|cni|lxc|nodelocaldns|tunl).*'
+      - sourceLabels: [__name__]
+        action: drop
+        regex: 'container_spec.*'
+      - sourceLabels: [id, pod]
+        action: drop
+        regex: '.+;'
+    probes: true
+    probesRelabelings:
+      - action: replace
+        sourceLabels: [__metrics_path__]
+        targetLabel: metrics_path
+    resource: false
+    https: true
+    insecureSkipVerify: true
+    interval: ""
+    honorLabels: true
+    honorTimestamps: true
+    trackTimestampsStaleness: true
+
+kubernetesServiceMonitors:
+  enabled: true
+kubeApiServer:
+  enabled: true
+  tlsConfig:
+    serverName: kubernetes
+    insecureSkipVerify: false
+kubeControllerManager:
+  enabled: true
+  service:
+    enabled: true
+    port: null
+    targetPort: null
+kubeScheduler:
+  enabled: true
+  service:
+    enabled: true
+    port: null
+    targetPort: null
+kubeProxy:
+  enabled: true
+coreDns:
+  enabled: true
+kubeEtcd:
+  enabled: false
+windowsMonitoring:
+  enabled: false
+
+defaultRules:
+  create: true
+  rules:
+    alertmanager: true
+    etcd: false
+    configReloaders: true
+    general: true
+    k8sContainerCpuUsageSecondsTotal: true
+    k8sContainerMemoryCache: true
+    k8sContainerMemoryRss: true
+    k8sContainerMemorySwap: true
+    k8sContainerResource: true
+    k8sContainerMemoryWorkingSetBytes: true
+    k8sPodOwner: true
+    kubeApiserverAvailability: true
+    kubeApiserverBurnrate: true
+    kubeApiserverHistogram: true
+    kubeApiserverSlos: true
+    kubeControllerManager: true
+    kubelet: true
+    kubeProxy: true
+    kubePrometheusGeneral: true
+    kubePrometheusNodeRecording: true
+    kubernetesApps: true
+    kubernetesResources: true
+    kubernetesStorage: true
+    kubernetesSystem: true
+    kubeSchedulerAlerting: true
+    kubeSchedulerRecording: true
+    kubeStateMetrics: true
+    network: true
+    node: true
+    nodeExporterAlerting: true
+    nodeExporterRecording: true
+    prometheus: true
+    prometheusOperator: true
+    windows: false
+
+thanosRuler:
+  enabled: false

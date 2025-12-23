@@ -1,0 +1,27 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: falco-monitor
+  namespace: prometheus
+  labels:
+    # 1. Prometheus가 이 ServiceMonitor를 찾기 위한 라벨 (초대장)
+    release: goyo-prometheus-stack
+    app: falco
+spec:
+  # 2. 어떤 Service를 감시할 것인가? (보여주신 라벨 정보 반영)
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: falco
+      app.kubernetes.io/instance: goyo-falco  # <--- 이 부분이 중요했습니다!
+  
+  # 3. 네임스페이스 지정
+  namespaceSelector:
+    matchNames:
+      - falco
+  
+  # 4. 메트릭 가져오기
+  endpoints:
+  - port: metrics       # Falco Service 포트 이름 (metrics 또는 http)
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s

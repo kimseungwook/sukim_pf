@@ -1,0 +1,26 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kyverno-metric-monitor
+  namespace: prometheus  # Prometheus가 있는 곳
+  labels:
+    release: goyo-prometheus-stack  # Prometheus 수집용 라벨
+    app: kyverno
+spec:
+  # [핵심] 메트릭 전용 서비스(goyo-kyverno-svc-metrics)를 찾도록 라벨 지정
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: goyo-kyverno
+      # 보통 메트릭 서비스엔 이 라벨이 붙습니다. (위 1단계 명령어로 확인 가능)
+      # 만약 안 되면 아래 component 라벨 줄을 지우거나, 1단계에서 나온 라벨로 교체하세요.
+      app.kubernetes.io/component: metrics 
+  
+  namespaceSelector:
+    matchNames:
+      - kyverno
+  
+  endpoints:
+  - port: metrics-port  # 캡처화면에 나온 정확한 포트 이름!
+    path: /metrics
+    interval: 30s
+    scheme: http        # 8000번 포트는 보통 HTTP입니다.
