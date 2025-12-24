@@ -1,0 +1,15 @@
+apiVersion: operator.tekton.dev/v1alpha1
+kind: TektonConfig
+metadata:
+  name: config
+  namespace: tekton-pipelines
+spec:
+  config:
+    nodeSelector:
+      goyo-svc: deploy
+    tolerations:
+    - key: "goyo-svc"
+      operator: "Equal"
+      value: "deploy"
+      effect: "NoSchedule"
+    priorityClassName: system-node-critical

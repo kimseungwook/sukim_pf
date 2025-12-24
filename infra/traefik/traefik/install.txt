@@ -1,0 +1,6 @@
+
+k apply -f nocodb/traefik/ingress-route-http.yaml
+k apply -f nocodb/traefik/ingress-route-https.yaml
+k apply -f nocodb/traefik/middleware-http-https.yaml
+
+helm upgrade goyoai-tools-traefik traefik/traefik -n traefik -f goyoai-traefik/traefik/traefik-values.yaml 

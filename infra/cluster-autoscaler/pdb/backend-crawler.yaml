@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: goyoai-web-back-crawler-pdb
+  namespace: goyoai-web
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: goyoai-backend-crawler-app

@@ -1,0 +1,3 @@
+helm repo add argo https://argoproj.github.io/argo-helm
+
+helm upgrade --install goyo-argocd argo/argo-cd -f argocd/values.yaml -n argocd

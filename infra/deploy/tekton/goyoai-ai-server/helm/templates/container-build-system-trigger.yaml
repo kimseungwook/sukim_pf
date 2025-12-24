@@ -1,0 +1,188 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: {{ required "A value for .Values.system_build_task_name is required!" .Values.system_build_task_name }}-trigger
+  namespace: tekton-pipelines
+spec:
+  description: >-
+    This Task triggers a Kaniko Job on Virtual Node and waits for completion.
+    Optimized for Python projects using uv package manager.
+  params:
+    - name: container-registry-url
+      type: string
+    - name: container-registry-cache-url
+      type: string
+    - name: timestamp
+      type: string
+    - name: project-name
+      type: string
+      default: {{ .Values.project_name }}
+    - name: git-short-sha
+      type: string
+    - name: module-name
+      type: string
+      description: "The module to build"
+    - name: dockerfile-name
+      type: string
+    - name: giturl
+      type: string
+    - name: revision
+      type: string
+  
+  workspaces:
+    - name: {{ .Values.project_name }}
+      description: Not used, but kept for compatibility
+  
+  results:
+    - name: image-url
+      description: The built image URL
+  
+  steps:
+    - name: create-kaniko-job
+      image: gdhb.goyoai.com/common/kubectl:1.34.2
+      script: |
+        #!/bin/sh
+        set -e
+        
+        JOB_NAME="kaniko-build-$(params.module-name)-$(params.timestamp)"
+        
+        MODULE_NAME="$(params.module-name)"
+        
+        # Python 프로젝트는 단일 base image 사용
+        BASE_IMAGE="gdhb.goyoai.com/common/python:3.11-slim"
+        echo "✓ Using Python base image: ${BASE_IMAGE}"
+        echo ""
+
+        cat <<EOF | kubectl apply --validate=false -f -
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: ${JOB_NAME}
+          namespace: tekton-pipelines
+          labels:
+            tekton-trigger: "true"
+            job-name: ${JOB_NAME}
+            module: $(params.module-name)
+        spec:
+          ttlSecondsAfterFinished: 3600
+          backoffLimit: 0
+          template:
+            metadata:
+              labels:
+                app: kaniko-build
+                job-name: ${JOB_NAME}
+                module: $(params.module-name)
+            spec:
+              nodeSelector:
+                workload-type: tekton-build
+              tolerations:
+              - key: workload
+          mountPath: /tmp
+    
+    - name: wait-for-job
+      image: "gdhb.goyoai.com/common/kubectl:1.34.2"
+      script: |
+        #!/bin/sh
+        set -e
+        
+        JOB_NAME=$(cat /tmp/job-name)
+        echo "=========================================="
+        echo "📦 Waiting for Kaniko Build Job"
+        echo "=========================================="
+        echo "Job Name: ${JOB_NAME}"
+        echo "Timeout: 1800 seconds (30 minutes)"
+        echo "=========================================="
+        echo ""
+        
+        echo "⏳ Waiting for Pod to be created..."
+        POD_NAME=""
+        for i in $(seq 1 60); do
+          POD_NAME=$(kubectl get pods -n tekton-pipelines -l job-name=${JOB_NAME} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+          if [ -n "$POD_NAME" ]; then
+            echo "✓ Pod created: ${POD_NAME}"
+            break
+          fi
+          sleep 1
+        done
+        
+        if [ -z "$POD_NAME" ]; then
+          echo "✗ Pod creation timeout"
+          exit 1
+        fi
+        
+        echo ""
+        echo "⏳ Waiting for Pod to start running..."
+        for i in $(seq 1 120); do
+          POD_STATUS=$(kubectl get pod ${POD_NAME} -n tekton-pipelines -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+          if [ "$POD_STATUS" = "Running" ] || [ "$POD_STATUS" = "Succeeded" ]; then
+            echo "✓ Pod is ${POD_STATUS}"
+            break
+          fi
+          if [ $((i % 10)) -eq 0 ]; then
+            echo "  Pod status: ${POD_STATUS} (${i}s)"
+          fi
+          sleep 1
+        done
+        
+        echo ""
+        echo "=========================================="
+        echo "📋 Streaming Kaniko Build Logs"
+        echo "=========================================="
+        echo ""
+        
+        kubectl logs -f ${POD_NAME} -n tekton-pipelines -c kaniko-build 2>/dev/null &
+        LOG_PID=$!
+        
+        TIMEOUT=1800
+        ELAPSED=0
+        INTERVAL=5
+        
+        while [ $ELAPSED -lt $TIMEOUT ]; do
+          STATUS=$(kubectl get job ${JOB_NAME} -n tekton-pipelines -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}' 2>/dev/null || echo "")
+          FAILED=$(kubectl get job ${JOB_NAME} -n tekton-pipelines -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' 2>/dev/null || echo "")
+          
+          if [ "$STATUS" = "True" ]; then
+            sleep 2
+            kill $LOG_PID 2>/dev/null || true
+            echo ""
+            echo "=========================================="
+            echo "✅ Build Completed Successfully!"
+            echo "=========================================="
+            echo "Image: $(params.container-registry-url)/$(params.module-name):$(params.git-short-sha)-$(params.timestamp)"
+            echo "=========================================="
+            echo "$(params.container-registry-url)/$(params.module-name):$(params.git-short-sha)-$(params.timestamp)" > $(results.image-url.path)
+            exit 0
+          fi
+          
+          if [ "$FAILED" = "True" ]; then
+            kill $LOG_PID 2>/dev/null || true
+            echo ""
+            echo "=========================================="
+            echo "❌ Build Failed"
+            echo "=========================================="
+            echo ""
+            echo "=== Last 1000 lines of logs ==="
+            kubectl logs ${POD_NAME} -n tekton-pipelines -c kaniko-build --tail=1000 2>/dev/null || true
+            echo ""
+            echo "=== Pod Status ==="
+            kubectl describe pod ${POD_NAME} -n tekton-pipelines | tail -50
+            exit 1
+          fi
+          
+          sleep $INTERVAL
+          ELAPSED=$((ELAPSED + INTERVAL))
+        done
+        
+        kill $LOG_PID 2>/dev/null || true
+        echo ""
+        echo "=========================================="
+        echo "⏱️  Build Timeout (30 minutes)"
+        echo "=========================================="
+        exit 1
+      volumeMounts:
+        - name: job-info
+          mountPath: /tmp
+  
+  volumes:
+    - name: job-info
+      emptyDir: {}

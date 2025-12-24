@@ -1,0 +1,27 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: authentik-https
+  namespace: traefik
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`gdauth.goyoai.com`)
+      priority: 10
+      services:
+        - name: authentik-server
+          namespace: authentik
+          port: 80
+
+    - kind: Rule
+      match: Host(`gdauth.goyoai.com`) && PathPrefix(`/grpc`)
+      priority: 11
+      services:
+        - name: authentik-server
+          namespace: authentik
+          port: 80
+          scheme: h2c
+  tls: 
+    secretName: goyoai-webs-tls

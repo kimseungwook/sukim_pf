@@ -1,63 +1,256 @@
-global:
-  affinity: #{}
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
+# =============================================================================
+# Authentik Helm Values - Customized for sukim-pf
+# =============================================================================
+# 최신 버전 호환: authentik helm chart 2024.x+
+# 참고: redis subchart가 제거됨 - 별도의 Redis/Valkey 설치 필요
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 공통 변수 정의 (YAML Anchors)
+# -----------------------------------------------------------------------------
+x-common-node-affinity: &common-node-affinity
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
         - matchExpressions:
-          - key: goyo-svc
-            operator: In
-            values:
-            - "deploy"
+            - key: service
+              operator: In
+              values:
+                - "tools"
+            - key: cpu-type
+              operator: In
+              values:
+                - "arm64"
+
+# =============================================================================
+# Global Configuration
+# =============================================================================
+global:
+  # Bitnami 이미지 보안 오버라이드 허용
+  security:
+    allowInsecureImages: true
+
+  # 공통 affinity 설정 사용
+  affinity:
+    <<: *common-node-affinity
+    podAntiAffinity: soft
+
+# =============================================================================
+# Authentik Core Configuration
+# =============================================================================
 authentik:
-  secret_key: "VkM0iJx7$ynzFLEPY8*0o^Vw9cK2jmRQ4CsTefgHIUu1OG6Np3"
+  # 로그 레벨
+  log_level: info
+
+  # Error Reporting (Sentry)
   error_reporting:
     enabled: true
-  postgresql:
-    password: "YjNkYzdkMDM3Y2VlOWY2NTMxMmJiZWM0MGEyOTIzYmM="
+    environment: "dev"
+    send_pii: false
 
+  # Secret Key - Secret에서 참조
+  # 주의: 이 값은 설치 후 변경하면 안됨
+  secret_key: ""  # Secret에서 AUTHENTIK_SECRET_KEY 환경변수로 주입
+
+  # PostgreSQL 설정
+  postgresql:
+    # host는 기본값 사용: {{ .Release.Name }}-postgresql
+    name: "authentik"
+    user: "authentik"
+    password: ""  # Secret에서 AUTHENTIK_POSTGRESQL__PASSWORD 환경변수로 주입
+    port: 5432
+
+  # Valkey(Redis) 설정
+  redis:
+    host: "authentik-valkey-primary:6379"
+    password: ""
+
+# =============================================================================
+# Server Configuration
+# =============================================================================
 server:
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-        - matchExpressions:
-          - key: goyo-svc
-            operator: In
-            values:
-            - "deploy"
+  enabled: true
+  replicas: 1
+
+  # 리소스 설정
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+  # Secret에서 민감 정보를 환경변수로 주입
+  envFrom:
+    - secretRef:
+        name: authentik-secrets
+
+  # Metrics & ServiceMonitor
+  metrics:
+    enabled: true
+    service:
+      type: ClusterIP
+      servicePort: 9300
+      portName: metrics
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
+      labels:
+        release: prometheus-stack
+
+# =============================================================================
+# Worker Configuration  
+# =============================================================================
 worker:
-  affinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-        - matchExpressions:
-          - key: goyo-svc
-            operator: In
-            values:
-            - "deploy"            
+  enabled: true
+  replicas: 1
+
+  # 리소스 설정
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+  # Secret에서 민감 정보를 환경변수로 주입
+  envFrom:
+    - secretRef:
+        name: authentik-secrets
+
+  # Metrics & ServiceMonitor
+  metrics:
+    enabled: true
+    service:
+      type: ClusterIP
+      servicePort: 9300
+      portName: metrics
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
+      labels:
+        release: prometheus-stack
+
+# =============================================================================
+# PostgreSQL Subchart Configuration
+# =============================================================================
 postgresql:
   enabled: true
+
+  # 공식 PostgreSQL 이미지 사용 (Bitnami 대신)
+  image:
+    registry: docker.io
+    repository: library/postgres
+    tag: "17.0-bookworm"
+
   auth:
-    password: "YjNkYzdkMDM3Y2VlOWY2NTMxMmJiZWM0MGEyOTIzYmM="
+    username: authentik
+    database: authentik
+    # 통합 Secret에서 참조
+    existingSecret: "authentik-secrets"
+    secretKeys:
+      userPasswordKey: "password"
+      adminPasswordKey: "postgres-password"
+
   primary:
+    # Node Affinity
     affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: goyo-svc
-                operator: In
-                values:
-                - "deploy"
-redis:
-  enabled: true
-  master:
-    affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: goyo-svc
-                operator: In
-                values:
-                - "deploy"
+      <<: *common-node-affinity
+
+    # PostgreSQL 설정
+    args:
+      - -c
+      - config_file=/bitnami/postgresql/conf/postgresql.conf
+      - -c
+      - hba_file=/bitnami/postgresql/conf/pg_hba.conf
+
+    configuration: |
+      listen_addresses = '*'
+      port = '5432'
+      wal_level = 'replica'
+      fsync = 'on'
+      hot_standby = 'on'
+      log_connections = 'false'
+      log_disconnections = 'false'
+      log_hostname = 'false'
+      client_min_messages = 'error'
+      include_dir = 'conf.d'
+
+    pgHbaConfiguration: |
+      host     all             all             0.0.0.0/0               scram-sha-256
+      host     all             all             ::/0                    scram-sha-256
+      local    all             all                                     scram-sha-256
+      host     all             all        127.0.0.1/32                 scram-sha-256
+      host     all             all        ::1/128                      scram-sha-256
+
+    extendedConfiguration: |
+      max_connections = 500
+
+    extraEnvVars:
+      - name: POSTGRES_DB
+        value: 'authentik'
+
+    # 리소스
+    resourcesPreset: "none"
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
+
+    # Persistence
+    persistence:
+      enabled: true
+      size: 8Gi
+      # storageClass: ""
+
+    containerSecurityContext:
+      readOnlyRootFilesystem: false
+
+  # 불필요한 컴포넌트 비활성화
+  readReplicas:
+    resourcesPreset: "none"
+  backup:
+    resourcesPreset: "none"
+  passwordUpdateJob:
+    resourcesPreset: "none"
+  volumePermissions:
+    resourcesPreset: "none"
+  metrics:
+    resourcesPreset: "none"
+
+# =============================================================================
+# Redis Configuration (별도 설치 필요 - 최신 버전에서 subchart 제거됨)
+# =============================================================================
+# 아래 방법 중 하나를 선택하세요:
+#
+# 옵션 1: Bitnami Redis Helm Chart 별도 설치
+#   helm upgrade --install authentik-redis bitnami/redis -n authentik \
+#     --set architecture=standalone \
+#     --set auth.enabled=false
+#
+# 옵션 2: Valkey 사용 (Redis 호환)
+#   helm upgrade --install authentik-valkey bitnami/valkey -n authentik --create-namespace
+#
+# 설치 후 authentik.redis.host 값을 업데이트하세요.
+# =============================================================================
+
+# =============================================================================
+# Service Account
+# =============================================================================
+serviceAccount:
+  create: true
+  annotations: {}
+  fullnameOverride: authentik
+
+# =============================================================================
+# Monitoring - PrometheusRule
+# =============================================================================
+prometheus:
+  rules:
+    enabled: true
+    labels:
+      release: prometheus-stack

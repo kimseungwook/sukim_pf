@@ -1,0 +1,49 @@
+# TurboRepo + PNPM 캐시용 PVC 설정
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.gointern_pnpm_cache_pvc_name }}
+  namespace: tekton-pipelines
+  labels:
+    app: goyoai-gointern-web
+    cache-type: pnpm-store
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.storage_ClassName }}
+  resources:
+    requests:
+      storage: 20Gi  # PNPM store는 많은 패키지를 캐시하므로 더 큰 용량
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.gointern_turbo_cache_pvc_name }}
+  namespace: tekton-pipelines
+  labels:
+    app: goyoai-gointern-web
+    cache-type: turbo-cache
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.storage_ClassName }}
+  resources:
+    requests:
+      storage: 15Gi  # TurboRepo 빌드 결과 캐시
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.gointern_nextjs_cache_pvc_name }}
+  namespace: tekton-pipelines
+  labels:
+    app: goyoai-gointern-web
+    cache-type: nextjs-cache
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.storage_ClassName }}
+  resources:
+    requests:
+      storage: 10Gi  # Next.js 컴파일 캐시 (앱별로 분리)

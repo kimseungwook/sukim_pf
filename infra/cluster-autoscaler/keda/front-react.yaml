@@ -1,0 +1,123 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: frontend-node-scaler
+  namespace: goyoai-web
+spec:
+  scaleTargetRef:
+    name: goyoai-web-front-react
+    kind: Deployment
+  pollingInterval: 15
+  cooldownPeriod: 300
+  minReplicaCount: 2
+  maxReplicaCount: 20
+  triggers:
+  - type: prometheus
+    metadata:
+      serverAddress: "http://goyoai-prometheus-stack-ku-prometheus.prometheus.svc.cluster.local:9090"
+      metricName: frontend_node_resource_utilization
+      threshold: "60"
+      query: >
+        max(
+          avg by (instance) (
+            sum by (instance) (rate(node_cpu_seconds_total{mode!="idle"}[2m]))
+            /
+            sum by (instance) (rate(node_cpu_seconds_total[2m]))
+            * 100
+          )
+          * on(instance)
+          group_left(node_ip, label_goyo_svc)
+          (
+            label_replace(
+              label_replace(
+                kube_node_labels{label_goyo_svc="frontend-web"},
+                "node_ip",
+                "$1",
+                "node",
+                "(.*)"
+              ),
+              "instance",
+              "$1:9100",
+              "node_ip",
+              "(.*)"
+            )
+          )
+        )
+
+  - type: prometheus
+    metadata:
+      serverAddress: "http://goyoai-prometheus-stack-ku-prometheus.prometheus.svc.cluster.local:9090"
+      metricName: node_memory_usage
+      threshold: "60"
+      query: >
+        max(
+          (
+            (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+            / node_memory_MemTotal_bytes
+            * 100
+          )
+          * on(instance)
+          group_left(node_ip, label_goyo_svc)
+          (
+            label_replace(
+              label_replace(
+                kube_node_labels{label_goyo_svc="frontend-web"},
+                "node_ip",
+                "$1",
+                "node",
+                "(.*)"
+              ),
+              "instance",
+              "$1:9100",
+              "node_ip",
+              "(.*)"
+            )
+          )
+        )
+
+  - type: prometheus
+    metadata:
+      serverAddress: "http://goyoai-prometheus-stack-ku-prometheus.prometheus.svc.cluster.local:9090"
+      metricName: pod_cpu_usage
+      threshold: "50"
+      query: |
+        sum(rate(container_cpu_usage_seconds_total{namespace="goyoai-web",pod=~"goyoai-web-front-react-.*"}[2m]))
+        /
+        sum(kube_pod_container_resource_requests{namespace="goyoai-web",pod=~"goyoai-web-front-react-.*",resource="cpu"})
+        * 100
+
+  - type: prometheus
+    metadata:
+      serverAddress: "http://goyoai-prometheus-stack-ku-prometheus.prometheus.svc.cluster.local:9090"
+      metricName: pod_memory_usage
+      threshold: "50"
+      query: |
+        sum(container_memory_usage_bytes{namespace="goyoai-web",pod=~"goyoai-web-front-react-.*"})
+        /
+        sum(kube_pod_container_resource_requests{namespace="goyoai-web",pod=~"goyoai-web-front-react-.*",resource="memory"})
+        * 100
+
+  - type: prometheus
+    metadata:
+      serverAddress: "http://goyoai-prometheus-stack-ku-prometheus.prometheus.svc.cluster.local:9090"
+      metricName: network_traffic
+      threshold: "90"
+      query: |
+        sum(rate(container_network_receive_bytes_total{namespace="goyoai-web",pod=~"goyoai-web-front-react-.*"}[2m])) 
+        / 1024 / 1024
+
+  - type: prometheus
+    metadata:
+      serverAddress: "http://goyoai-prometheus-stack-ku-prometheus.prometheus.svc.cluster.local:9090"
+      metricName: node_not_ready
+      threshold: "1"
+      query: |
+        1 + (
+          count(kube_node_labels{label_goyo_svc="frontend-web"})
+          - 
+          count(
+            kube_node_status_condition{condition="Ready", status="true"}
+            * on(node) 
+            kube_node_labels{label_goyo_svc="frontend-web"}
+          )
+        )

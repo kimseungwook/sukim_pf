@@ -1,0 +1,131 @@
+# 🚀 수정된 values.yaml (성능 극대화)
+# ===============================
+# Git 저장소 설정 
+# ===============================
+gitUrl: "https://github.com/kimseungwook/sukim-frontend-web"
+gitRevisions: ["main"]
+gitRevision: "main"
+
+# ===============================
+# 앱 및 빌드 설정
+# ===============================
+app_name: "goyoai-gointern-web"
+dockerfile_name: "dockerfile-b2b-dev"
+project_name: "gointern-frontend-web"
+
+# ===============================
+# Task 이름 설정
+# ===============================
+gointern_frontend_build_task_name: "gointern-frontend-image-build"
+
+# ===============================
+# 컨테이너 레지스트리 설정
+# ===============================
+container_registry_secretName: "harbor-registry-secret"
+container_registry_url: "gdhb.goyoai.com/gointern"
+container_registry_cache_url: "gdhb.goyoai.com/gointern-cache"
+
+# ===============================
+# 이미지 URL 설정 (수정됨)
+# ===============================
+common_alpine_url: "gdhb.goyoai.com/common/alpine:3.20.3"
+common_alpine_git_url: "gdhb.goyoai.com/common/git:2.45.2"
+common_kaniko_url: "gcr.io/kaniko-project/executor:v1.23.2"  # 수정: 일관성 유지
+
+# ===============================
+# 스토리지 설정 (수정됨)
+# ===============================
+storage_ClassName: "oci-bv"
+storage_size: "15Gi"  # 수정: 5Gi → 15Gi (성능 우선)
+
+# ===============================
+# 캐시 PVC 설정
+# ===============================
+gointern_pnpm_cache_pvc_name: "gointern-frontend-pnpm-cache"
+gointern_turbo_cache_pvc_name: "gointern-frontend-turbo-cache" 
+gointern_nextjs_cache_pvc_name: "gointern-frontend-nextjs-cache"
+
+# ===============================
+# Kustomize 설정
+# ===============================
+kustomize_git_url: "https://github.com/GoyoAi-Service/goyoai-web-manifest"
+front_kustomize_git_branch: "main"
+front_kustomize_directory: "gointern-frontend/overlays/main"
+front_deployment_name: "main-goyoai-frontend"
+manifestFileName: "goyoai-frontend-manifest.yaml"
+commitMessage: "Update Frontend Kubernetes manifest"
+
+# ===============================
+# 노드 스케줄링 설정
+# ===============================
+el_serviceAccountName: "tekton-triggers-sa"
+git_serviceAccountName: "tekton-sukim-token"
+el_node_selector_key: "goyo-svc"
+el_node_selector_value: "deploy"
+el_tolerations_key: "goyo-svc"
+el_tolerations_value: "deploy"
+el_tolerations_operator: "Equal"
+el_tolerations_effect: "NoSchedule"
+trigger_node_selector_key: "goyo-svc"
+trigger_node_selector_value: "deploy"
+trigger_node_affinity_operator: "In"
+trigger_tolerations_key: "goyo-svc"
+trigger_tolerations_value: "deploy"
+trigger_tolerations_operator: "Equal"
+trigger_tolerations_effect: "NoSchedule"
+
+# ===============================
+# 알림 설정 (개발환경용)
+# ===============================
+slack_webhook_url: "https://hooks.slack.com/services/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"
+slack_message: "🔥 BLAZING BUILD completed for goyoai-gointern-web"
+
+# ===============================
+# 🚀 성능 극한 최적화 설정 (추가됨)
+# ===============================
+performance:
+  # 캐시 전략
+  cache_ttl: "24h"                    # 빠른 갱신
+  compressed_caching: false           # 속도 우선
+  cleanup_enabled: false              # 정리 과정 스킵
+  
+  # 극한 리소스 설정
+  build_resources:
+    requests:
+      memory: "3Gi"                   # 4Gi → 6Gi
+      cpu: "1"                        # 2 → 3
+    limits:
+      memory: "4Gi"                  # 8Gi → 10Gi
+      cpu: "2"                        # 4 → 6
+  
+  # 병렬 처리 극한 최적화
+  parallel_jobs: 8                    # 4 → 8
+  network_concurrency: 32             # 16 → 32
+  child_concurrency: 16               # 8 → 16
+  threadpool_size: 16                 # Node.js 스레드풀
+  
+  # 개발환경 특화 설정
+  dev_mode: true
+  node_env: "development"             # production → development
+  skip_tests: true                    # 테스트 스킵
+  skip_lint: true                     # 린트 스킵 (빌드 시)
+  minimal_logging: true               # 로그 최소화
+  
+  # Go 런타임 최적화
+  go_gc: 50                           # 100 → 50 (더 공격적)
+  go_memory_limit: "9GiB"             # 6GiB → 9GiB
+  go_max_procs: 6                     # CPU 최대 활용
+  
+  # 빠른 실패 설정
+  fast_fail: true
+  retry_count: 1                      # 3 → 1
+  timeout_short: true
+  
+  # 캐시 공격적 활용
+  aggressive_caching: true
+  cache_everything: true
+  ignore_cache_miss: false
+  
+  # Traefik LB 최적화
+  traefik_optimized: true
+  harbor_dns_bypass: true             # Harbor 내부 DNS 우회

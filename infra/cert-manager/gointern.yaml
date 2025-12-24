@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: goyoai-webs-tls
+  namespace: goyoai-web
+spec:
+  secretName: goyoai-webs-tls
+  issuerRef:
+    name: goyoai-tools
+    kind: ClusterIssuer
+  dnsNames:
+    - gointern-api.goyoai.com

@@ -1,0 +1,63 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: hyper-report-backend-relay-git-clone
+  namespace: tekton-pipelines
+spec:
+  workspaces:
+    - name: hyper-report-web
+  params:
+    - name: revision
+      type: string
+    - name: giturl
+      type: string
+    - name: project-name
+      type: string
+      default: hyper-report
+
+  results:
+    - name: commit
+      description: The git commit hash
+
+  steps:
+    - name: clean-workspace
+      # image: icn.ocir.io/cntwrbo3mm3p/alpine-linux:3.19.1
+      image: alpine
+      script: |
+        #!/bin/sh
+        WORKSPACE_PATH=$(workspaces.hyper-report-web.path)
+        PROJECT_DIR=$WORKSPACE_PATH/$(params.project-name)-source
+        # Create project directory if not exists
+        mkdir -p $PROJECT_DIR
+        # Clean the workspace
+        rm -rf $PROJECT_DIR/.[!.]* $PROJECT_DIR/*
+        if [ "$(ls -A $PROJECT_DIR)" ]; then
+          echo "Project directory is not empty after cleaning."
+          ls -al $PROJECT_DIR
+          exit 1
+        else
+          echo "Project directory is now clean."
+        fi
+
+    - name: clone-repository
+      image: alpine/git
+      script: |
+        #!/bin/sh
+        WORKSPACE_PATH=$(workspaces.hyper-report-web.path)
+        PROJECT_DIR=$WORKSPACE_PATH/$(params.project-name)-source
+        git config --global --add safe.directory $PROJECT_DIR
+        # Clone the repository
+        git clone -b $(params.revision) $(params.giturl) $PROJECT_DIR
+        cd $PROJECT_DIR
+        # Capture commit hash
+        git rev-parse --short HEAD > $(results.commit.path)
+          
+    # - name: notify-slack
+    #   image: alpine
+    #   script: |
+    #     #!/bin/sh
+    #     apk add --no-cache curl
+    #     SLACK_WEBHOOK_URL="https://hooks.slack.com/services/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"
+    #     # 슬랙 메시지 내용
+    #     SLACK_MESSAGE="$(params.project-name) Git Clone 완료"
+    #     curl -X POST -H 'Content-type: application/json' --data '{"text":"'"$SLACK_MESSAGE"'"}' $SLACK_WEBHOOK_URL

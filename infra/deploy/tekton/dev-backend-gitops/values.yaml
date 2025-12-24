@@ -1,0 +1,23 @@
+# 프로젝트 기본 정보
+project_name: "goyoai-web-back-2nd"
+namespace: "tekton-pipelines"
+
+# 컨테이너 레지스트리
+container_registry_url: "gdhb.goyoai.com/gointern/goyoai-gointern-system"
+
+# GitOps 레포지토리
+kustomize_git_url: "https://github.com/GoyoAi-Service/goyoai-web-manifest"
+kustomize_git_branch: "dev"
+kustomize_directory: "goyoai-backend-system"
+
+# 공통 이미지
+common_alpine_url: "gdhb.goyoai.com/common/alpine:3.20.0"
+common_alpine_git_url: "gdhb.goyoai.com/common/git:2.45.2"
+
+# PVC
+pvc:
+  storageClassName: "oci-bv"
+  size: "1Gi"
+
+# ServiceAccount
+serviceAccountName: "tekton-triggers-sa"

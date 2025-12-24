@@ -1,0 +1,107 @@
+# goyo_dev/harbor/harbor-ca-installer-daemonset.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: harbor-ca-installer
+  namespace: kube-system
+  labels:
+    app: harbor-ca-installer
+spec:
+  selector:
+    matchLabels:
+      app: harbor-ca-installer
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: harbor-ca-installer
+    spec:
+      hostPID: true
+      hostNetwork: true
+      tolerations:
+      - operator: Exists
+      initContainers:
+      - name: install-ca
+        image: alpine:3.18
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -ex
+          
+          echo "=========================================="
+          echo "Installing Harbor CA certificate on node: $(hostname)"
+          echo "=========================================="
+          
+          # Step 0: CA 파일을 호스트 파일시스템에 먼저 복사
+          echo "Step 0: Copying CA to host filesystem..."
+          cp /tmp/harbor-ca/ca.crt /host/tmp/harbor-ca.crt
+          
+          # 호스트 파일시스템 접근
+          chroot /host /bin/bash <<'SCRIPT'
+          set -ex
+          
+          # 1. 시스템 CA 저장소에 추가
+          echo "Step 1: Adding CA to system trust store..."
+          cp /tmp/harbor-ca.crt /etc/pki/ca-trust/source/anchors/harbor-ca.crt
+          update-ca-trust
+          
+          # 2. CRI-O 레지스트리별 CA 설정
+          echo "Step 2: Configuring CRI-O registry CA..."
+          mkdir -p /etc/containers/certs.d/gdhb.go-intern.io
+          cp /tmp/harbor-ca.crt /etc/containers/certs.d/gdhb.go-intern.io/ca.crt
+          
+          # 3. CRI-O 재시작
+          echo "Step 3: Restarting CRI-O..."
+          systemctl restart crio
+          
+          # 4. 임시 파일 삭제
+          rm -f /tmp/harbor-ca.crt
+          
+          # 5. 확인
+          echo "Step 4: Verification..."
+          if [ -f /etc/pki/ca-trust/source/anchors/harbor-ca.crt ]; then
+            echo "✓ System CA installed"
+          fi
+          
+          if [ -f /etc/containers/certs.d/gdhb.go-intern.io/ca.crt ]; then
+            echo "✓ CRI-O registry CA installed"
+          fi
+          
+          if systemctl is-active --quiet crio; then
+            echo "✓ CRI-O is running"
+          else
+            echo "✗ CRI-O is not running"
+            exit 1
+          fi
+          
+          echo "=========================================="
+          echo "Harbor CA installation completed successfully!"
+          echo "=========================================="
+          SCRIPT
+        volumeMounts:
+        - name: host-root
+          mountPath: /host
+        - name: harbor-ca
+          mountPath: /tmp/harbor-ca
+        securityContext:
+          privileged: true
+      containers:
+      - name: pause
+        image: registry.k8s.io/pause:3.9
+        resources:
+          limits:
+            cpu: 10m
+            memory: 20Mi
+          requests:
+            cpu: 10m
+            memory: 20Mi
+      volumes:
+      - name: host-root
+        hostPath:
+          path: /
+          type: Directory
+      - name: harbor-ca
+        configMap:
+          name: harbor-ca

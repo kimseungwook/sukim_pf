@@ -1,0 +1,179 @@
+# 모듈화된 동적 파이프라인 템플릿 (aify 제거)
+# templates/pipelines.yaml
+# ===================================================================
+
+{{- range $moduleName, $moduleConfig := .Values.modules }}
+{{- if $moduleConfig.enabled }}
+# ===================================================================
+# 🔹 {{ upper $moduleName }} 모듈 파이프라인
+# ===================================================================
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: goyoai-gointern-{{ $moduleName }}
+  namespace: tekton-pipelines
+  labels:
+    {{- include "backend-system.labels" $ | nindent 4 }}
+    module: {{ $moduleName }}
+  annotations:
+    description: "{{ title $moduleName }} 모듈 CI/CD 파이프라인"
+spec:
+  params:
+    - name: giturl
+      type: string
+      description: "Git repository URL"
+    - name: container-registry-url
+      type: string
+      description: "Container registry URL"
+    - name: container-registry-cache-url
+      type: string
+      description: "Container registry cache URL"
+    - name: revision
+      type: string
+      description: "Git revision"
+    - name: manifest-file-name
+      type: string
+      description: "Kubernetes manifest file name"
+    - name: commit-message
+      type: string
+      default: "{{ $.Values.global.kustomize.commitMessage }}"
+      description: "Git commit message"
+    - name: project-name
+      type: string
+      description: "Project name"
+    - name: git-short-sha
+      type: string
+      description: "Short SHA of the commit"
+    - name: module-name
+      type: string
+      description: "Module name"
+    - name: dockerfile-name
+      type: string
+      description: "Dockerfile name"
+  
+  workspaces:
+    - name: {{ $.Values.global.project_name }}
+      description: "Shared workspace for the pipeline"
+  
+  tasks:
+    # 🔧 타임스탬프 생성
+    - name: generate-timestamp
+      taskRef:
+        name: generate-timestamp
+      params:
+        - name: project-name
+          value: $(params.project-name)
+    
+    # 📂 소스 코드 클론
+    - name: clone-repository
+      taskRef:
+        name: {{ $.Values.global.project_name }}-git-clone
+      params:
+        - name: giturl
+          value: $(params.giturl)
+        - name: revision
+          value: $(params.revision)
+        - name: project-name
+          value: $(params.project-name)
+        - name: module-name
+          value: $(params.module-name)
+      runAfter: ["generate-timestamp"]
+      workspaces:
+        - name: {{ $.Values.global.project_name }}
+          workspace: {{ $.Values.global.project_name }}
+    
+    # 🐳 컨테이너 이미지 빌드
+    - name: build-container-image
+      taskRef:
+        name: {{ $moduleConfig.taskName }}
+      params:
+        - name: container-registry-url
+          value: $(params.container-registry-url)
+        - name: container-registry-cache-url
+          value: $(params.container-registry-cache-url)
+        - name: project-name
+          value: $(params.project-name)
+        - name: timestamp
+          value: $(tasks.generate-timestamp.results.timestamp)
+        - name: git-short-sha
+          value: $(params.git-short-sha)
+        - name: module-name
+          value: $(params.module-name)
+        - name: dockerfile-name
+          value: $(params.dockerfile-name)
+      runAfter: ["clone-repository"]
+      workspaces:
+        - name: {{ $.Values.global.project_name }}
+          workspace: {{ $.Values.global.project_name }}
+    
+    # 📝 Manifest 업데이트 및 Git 푸시
+    - name: manifest-git-push
+      taskRef:
+        name: {{ $.Values.global.project_name }}-manifest
+      params:
+        - name: manifest-file-name
+          value: $(params.manifest-file-name)
+        - name: container-registry-url
+          value: $(params.container-registry-url)
+        - name: commit-message
+          value: $(params.commit-message)
+        - name: revision
+          value: $(params.revision)
+        - name: project-name
+          value: $(params.project-name)
+        - name: timestamp
+          value: $(tasks.generate-timestamp.results.timestamp)
+        - name: git-short-sha
+          value: $(params.git-short-sha)
+        - name: module-name
+          value: $(params.module-name)
+      runAfter: ["build-container-image"]
+      workspaces:
+        - name: {{ $.Values.global.project_name }}
+          workspace: {{ $.Values.global.project_name }}
+  
+  # 🏁 Finally 태스크 (정리 작업)
+  finally:
+    - name: slack-notify
+      taskRef:
+        name: slack-notification
+      params:
+        - name: webhook-url
+          value: "{{ $.Values.global.slack.webhook_url }}"
+        - name: message
+          value: |
+            🚀 {{ title $moduleName }} 모듈 빌드 완료!
+            📦 모듈: $(params.module-name)
+            🏷️ 태그: $(tasks.generate-timestamp.results.timestamp)-$(params.git-short-sha)
+            🌿 브랜치: $(params.revision)
+            ⏰ 시간: $(tasks.generate-timestamp.results.timestamp)
+        - name: status
+          value: $(tasks.status)
+
+{{- end }}
+{{- end }}
+
+# ===================================================================
+# 📊 생성된 파이프라인 요약 정보
+# ===================================================================
+# 
+# 활성화된 모듈별로 생성되는 파이프라인들:
+{{- range $moduleName, $moduleConfig := .Values.modules }}
+{{- if $moduleConfig.enabled }}
+# 
+# 🔹 {{ upper $moduleName }} 모듈:
+#   - 파이프라인: goyoai-gointern-{{ $moduleName }}
+#   - 빌드 태스크: {{ $moduleConfig.taskName }}
+#   - Git 브랜치: {{ $moduleConfig.git.branch }}
+#   - 모듈명: {{ $moduleConfig.build.moduleName }}
+{{- end }}
+{{- end }}
+# 
+# 각 파이프라인은 다음 태스크들을 포함:
+# 1. generate-timestamp - 타임스탬프 생성
+# 2. clone-repository - Git 클론
+# 3. build-container-image - 컨테이너 이미지 빌드
+# 4. manifest-git-push - Manifest 업데이트
+# 5. slack-notify (finally) - Slack 알림
+# ===================================================================

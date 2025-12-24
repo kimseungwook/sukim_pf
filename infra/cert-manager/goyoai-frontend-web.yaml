@@ -1,0 +1,17 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: goyoai-frontend-web-tls
+  namespace: goyoai-web
+spec:
+  secretName: goyoai-frontend-web-tls
+  issuerRef:
+    name: goyoai-tools
+    kind: ClusterIssuer
+  dnsNames:
+    - studio.goyoai.com
+    - dev2.goyoai.com
+    - dev-aify.goyoai.com
+    - dev.goyoai.com
+    - dev-cosmos.goyoai.com
+    - dev3.goyoai.com

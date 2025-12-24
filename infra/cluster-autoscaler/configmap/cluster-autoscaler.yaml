@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-autoscaler-config
+  namespace: kube-system  # Cluster Autoscaler가 실행되는 네임스페이스
+data:
+  config.yaml: |
+    extraArgs:
+      # 제거 가능한 파드의 우선순위 컷오프
+      expendable-pods-priority-cutoff: -10
+      # DaemonSet 파드의 리소스 사용량 무시
+      ignore-daemonsets-utilization: "true"
+      # 미러 파드의 리소스 사용량 무시
+      ignore-mirror-pods-utilization: "true"
+      # 자동 프로비저닝된 노드 그룹의 최대 수
+      max-autoprovisioned-node-group-count: "15"
+      # soft taint를 한 번에 적용할 수 있는 최대 노드 수
+      max-bulk-soft-taint-count: "10"
+      # 한 번에 삭제할 수 있는 최대 빈 노드 수
+      max-empty-bulk-delete: "5"
+      # 동시에 처리할 수 있는 최대 스케일 다운 작업 수
+      max-scale-down-parallelism: "10"
+      # 허용 가능한 준비되지 않은 노드 수
+      ok-total-unready-count: "3"
+    # 노드 그룹 자동 검색 설정
+    nodeGroupAutoDiscovery:
+      - label:k8s.io/cluster-autoscaler/enabled
+    # 클러스터 자동 검색 설정
+    autoDiscovery:
+      clusterName: hyper-report-oke-qa  # 실제 클러스터 이름으로 변경 필요

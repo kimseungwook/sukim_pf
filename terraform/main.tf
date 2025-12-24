@@ -164,8 +164,8 @@ module "oke" {
       nsg_ids                 = [module.nsg.worker_nsg_id]
       pod_nsg_ids             = [module.nsg.pod_nsg_id]
       max_pods_per_node       = 62
-      ocpus                   = 3
-      memory_in_gbs           = 24
+      ocpus                   = 6
+      memory_in_gbs           = 32
       is_pv_encryption_in_transit_enabled = false
       initial_node_labels     = { 
         "service" = "monitoring"
@@ -224,13 +224,13 @@ module "oke" {
   cost_center_value  = var.cost_center_value
 }
 
-# module "hyper-report-object-storage" {
-#   source = "./resources/object_storage"
-#   compartment_ocid = var.compartment_ocid
-#   namespace = "cntwrbo3mm3p"
-# }
+module "monitoring-object-storage" {
+  source = "./resources/object_storage"
+  compartment_ocid = var.compartment_ocid
+  namespace = "cn7ipyag4bte"
+}
 
-module "hyper-report-bastion" {
+module "sukim-bastion" {
   source = "./resources/bastion"
   compartment_ocid = var.compartment_ocid
   subnet_service_id = module.vcn.subnet_oke_api_id # Target: OKE API Subnet for kubectl

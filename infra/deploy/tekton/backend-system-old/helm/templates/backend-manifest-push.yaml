@@ -1,0 +1,129 @@
+# goyo_dev/deploy/tekton/backend-system/helm/templates/backend-manifest-push.yaml
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: {{ .Values.project_name }}-manifest
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: container-registry-url
+      type: string
+    - name: commit-message
+      type: string
+    - name: kustomize-revision
+      type: string
+      default: "{{ .Values.project_name }}"
+    - name: kustomize-directory
+      type: string
+      default: "{{ .Values.kustomize_directory }}"
+    - name: kustomize-giturl
+      type: string
+      default: {{ .Values.kustomize_git_url }}
+    - name: project-name
+      type: string
+      default: {{ .Values.project_name }}
+    - name: timestamp
+      type: string
+    - name: git-short-sha
+      type: string
+    - name: module-name
+      type: string
+      description: "The module name to build"
+    - name: back-kustomize-directory
+      type: string
+      default: "{{ .Values.back_kustomize_directory }}"
+    - name: portal-kustomize-directory
+      type: string
+      default: "{{ .Values.portal_kustomize_directory }}"
+    - name: back-deployment-name
+      type: string
+      default: "{{ .Values.back_deployment_name }}"
+    - name: portal-deployment-name
+      type: string
+      default: "{{ .Values.portal_deployment_name }}"
+    - name: back-kustomize-branch
+      type: string
+      default: "{{ .Values.back_kustomize_git_branch }}"
+    - name: portal-kustomize-branch
+      type: string
+      default: "{{ .Values.portal_kustomize_git_branch }}"
+  workspaces:
+    - name: {{ .Values.project_name }}
+  steps:
+    - name: clean-workspace
+      image: {{ .Values.common_alpine_url }}
+      script: |
+        #!/bin/sh
+        WORKSPACE_PATH=$(workspaces.{{ .Values.project_name }}.path)
+        PROJECT_DIR=$WORKSPACE_PATH/$(params.project-name)-manifest
+        mkdir -p $PROJECT_DIR
+        rm -rf $PROJECT_DIR/.[!.]* $PROJECT_DIR/*
+        echo "Workspace cleaned at $PROJECT_DIR"
+    - name: setup-kustomize-environment
+      image: {{ .Values.common_alpine_git_url }}
+      script: |
+        #!/bin/sh
+        set -e
+        WORKSPACE_PATH=$(workspaces.{{ .Values.project_name }}.path)
+        PROJECT_DIR=$WORKSPACE_PATH/$(params.project-name)-manifest
+        GIT_ROOT_PATH=$PROJECT_DIR
+        
+        # module-name에 따라 kustomize-directory 설정
+        if [ "$(params.module-name)" = "goyoai-gointern-portal" ]; then
+          KUSTOMIZE_DIR="$(params.portal-kustomize-directory)"
+          DEPLOYMENT_NAME="$(params.portal-deployment-name)"
+          KUSTOMIZE_BRANCH="$(params.portal-kustomize-branch)"
+        elif [ "$(params.module-name)" = "goyoai-gointern-system" ]; then
+          KUSTOMIZE_DIR="$(params.back-kustomize-directory)"
+          DEPLOYMENT_NAME="$(params.back-deployment-name)"
+          KUSTOMIZE_BRANCH="$(params.back-kustomize-branch)"
+        else
+          echo "Unknown module: $(params.module-name)"
+          exit 1
+        fi
+        
+        git config --global user.name "goyoai"
+        git config --global user.email "goyo-service_run@goyoai.com"
+        
+        if [ ! -d "$GIT_ROOT_PATH/.git" ]; then
+          git clone --branch $KUSTOMIZE_BRANCH $(params.kustomize-giturl) $GIT_ROOT_PATH
+        else
+          git -C $GIT_ROOT_PATH fetch origin
+          git -C $GIT_ROOT_PATH checkout $KUSTOMIZE_BRANCH || git -C $GIT_ROOT_PATH checkout -b $KUSTOMIZE_BRANCH
+          git -C $GIT_ROOT_PATH reset --hard origin/$KUSTOMIZE_BRANCH
+        fi
+        
+        OVERLAY_PATH="$GIT_ROOT_PATH/$KUSTOMIZE_DIR"
+        mkdir -p $OVERLAY_PATH
+        cd $OVERLAY_PATH
+        rm -rf $OVERLAY_PATH/*
+        
+        cat <<EOF > deployment_patches.yaml
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: $DEPLOYMENT_NAME
+        spec:
+          template:
+            spec:
+              containers:
+                - name: ${DEPLOYMENT_NAME}-container
+                  image: $(params.container-registry-url)/$(params.module-name):$(params.git-short-sha)-$(params.timestamp)
+        EOF
+        
+        git add deployment_patches.yaml
+        COMMIT_MESSAGE="$(params.commit-message) with new image tag $(params.git-short-sha)-$(params.timestamp)"
+        git commit -m "$COMMIT_MESSAGE"
+        git push --force-with-lease origin $KUSTOMIZE_BRANCH
+    - name: manifest-push-end
+      image: {{ .Values.common_alpine_url }}
+      script: |
+        #!/bin/sh
+        # Curl installation
+        apk add --no-cache curl
+        SLACK_WEBHOOK_URL="{{ .Values.slack_webhook_url }}"
+        
+        SLACK_MESSAGE="{{ .Values.slack_message }} - $(params.module-name)"
+        curl -X POST -H 'Content-type: application/json' \
+        --data '{"text":"'"$SLACK_MESSAGE"'"}' \
+        $SLACK_WEBHOOK_URL

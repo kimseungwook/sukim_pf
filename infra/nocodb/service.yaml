@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nocodb-service
+  namespace: nocodb
+  labels:
+    app: nocodb
+  annotations:
+    oci.oraclecloud.com/load-balancer-type: "lb"
+    service.beta.kubernetes.io/oci-load-balancer-shape: "flexible"
+    service.beta.kubernetes.io/oci-load-balancer-shape-flex-min: "10"
+    service.beta.kubernetes.io/oci-load-balancer-shape-flex-max: "10"
+    oci.oraclecloud.com/node-label-selector: service=tools
+    oci.oraclecloud.com/initial-freeform-tags-override: '{"Name": "Developer-Tools"}'
+    service.beta.kubernetes.io/oci-load-balancer-ssl-ports: "443"
+    service.beta.kubernetes.io/oci-load-balancer-tls-secret: nocodb/noco-tls-secret
+spec:
+  type: LoadBalancer
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 8080  # Assuming 'web' is the name of the port in your Traefik service
+    - name: https
+      protocol: TCP
+      port: 443
+      targetPort: 8080  # Assuming 'websecure' is the name of the port in your Traefik service
+  selector:
+    app.kubernetes.io/instance: nocodb

@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-agent-jar
+  namespace: hyper-report-web
+binaryData:
+  opentelemetry-javaagent.jar: |-
+    $(base64 < opentelemetry-javaagent.jar)

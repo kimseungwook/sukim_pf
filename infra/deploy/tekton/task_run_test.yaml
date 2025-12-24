@@ -1,0 +1,14 @@
+apiVersion: tekton.dev/v1beta1
+kind: TaskRun
+metadata:
+  name: example-run
+spec:
+  taskRef:
+    name: kaniko
+  workspaces:
+  - name: source
+    persistentVolumeClaim:
+      claimName: hyper-report-dev-frontend-source
+  - name: dockerconfig
+    secret:
+      secretName: ocir-secret

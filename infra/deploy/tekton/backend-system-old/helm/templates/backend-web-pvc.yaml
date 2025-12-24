@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.project_name}}-system
+  namespace: tekton-pipelines
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.storage_ClassName}}
+  resources:
+    requests:
+      storage: {{ .Values.storage_size}}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.project_name}}-portal
+  namespace: tekton-pipelines
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.storage_ClassName}}
+  resources:
+    requests:
+      storage: {{ .Values.storage_size}}

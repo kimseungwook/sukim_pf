@@ -1,0 +1,61 @@
+logs:
+  general:
+    level: DEBUG  # Sets the log level to DEBUG
+  access:
+    enabled: true
+service:
+  enabled: true
+  single: true  # Uses a single service for both TCP and UDP when set to true
+  type: LoadBalancer
+  annotations:
+    oci.oraclecloud.com/load-balancer-type: "lb"
+    oci.oraclecloud.com/oci-network-security-groups: "ocid1.networksecuritygroup.oc1.ap-seoul-1.aaaaaaaakrkd2bxy6hq6nh5lrmvulhhxzuu7phvzx3fbjdxinsdvaykzw7qa"
+    service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: "None"
+    service.beta.kubernetes.io/oci-load-balancer-shape: "flexible"
+    service.beta.kubernetes.io/oci-load-balancer-shape-flex-min: "10"
+    service.beta.kubernetes.io/oci-load-balancer-shape-flex-max: "10"
+    # service.beta.kubernetes.io/oci-load-balancer-tls-backendset-secret: cert-manager/cert-manager-webhook-ca
+    oci.oraclecloud.com/node-label-selector: service=tools
+    oci.oraclecloud.com/initial-freeform-tags-override: '{"Name": "goyo-svc-opentelemetry"}'
+    service.beta.kubernetes.io/oci-load-balancer-ssl-ports: "443"
+    # service.beta.kubernetes.io/oci-load-balancer-tls-secret: argocd/argocd-tls
+    # service.beta.kubernetes.io/oci-load-balancer-backend-protocol: "TCP"
+
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: "service"
+          operator: In
+          values:
+          - "monitoring"
+tolerations:
+  - key: "goyo-svc"
+    operator: "Equal"
+    value: "monitoring"
+    effect: "NoSchedule"
+providers:
+  kubernetesCRD:
+    namespaced:
+    - otlp
+  kubernetesIngress:
+    namespaces:
+    - otlp  # Specifies that Traefik should only monitor the 'nocodb' namespace
+ports:
+  web:
+    expose: true
+    port: 8000
+#     targetPort: 80
+    protocol: TCP
+  websecure:
+    expose: true
+    port: 8443
+    # targetPort: 80
+    protocol: TCP
+    # tls:
+    #   enabled: true
+    #   secretName: "argocd-tls"
+  # traefik:
+  #   expose: true

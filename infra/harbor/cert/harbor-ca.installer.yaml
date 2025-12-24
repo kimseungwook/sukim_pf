@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: harbor-ca-installer
+  # [수정] Secret이 있는 'traefik' 네임스페이스에 생성
+  namespace: traefik 
+  labels:
+    k8s-app: harbor-ca-installer
+spec:
+  selector:
+    matchLabels:
+      k8s-app: harbor-ca-installer
+  template:
+    metadata:
+      labels:
+        k8s-app: harbor-ca-installer
+    spec:
+      nodeSelector:
+        goyo-svc: deploy 
+        
+      initContainers:
+      - name: ca-installer
+        image: alpine:3.20 
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          set -e
+          mkdir -p /host-certs/gdhb.go-intern.io
+          cp /secret-volume/ca.crt /host-certs/gdhb.go-intern.io/ca.crt
+          echo "Successfully installed gdhb.go-intern.io CA certificate on host."
+        volumeMounts:
+        - name: host-certs-dir
+          mountPath: /host-certs
+        - name: cert-secret
+          mountPath: /secret-volume
+          readOnly: true
+
+      containers:
+      - name: sleeper
+        image: alpine:3.20
+        command: ["/bin/sh", "-c", "sleep infinity"]
+      
+      volumes:
+      - name: host-certs-dir
+        hostPath:
+          path: /etc/docker/certs.d
+          type: DirectoryOrCreate 
+      - name: cert-secret
+        secret:
+          secretName: goyoai-web-backoffice-tls
+          # [제거] 이 위치의 namespace 필드는 유효하지 않습니다.

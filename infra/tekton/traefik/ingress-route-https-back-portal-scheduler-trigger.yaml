@@ -1,0 +1,17 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: tekton-trigger-back-portal-scheduler-https
+  namespace: tekton-pipelines
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`gdwbackportalschedulerdev.goyoai.com`)
+      priority: 20
+      services:
+        - name: el-goyoai-web-back-portal-scheduler
+          port: 8080
+  tls: 
+    secretName: tekton-trigger-back-portal-scheduler-tls

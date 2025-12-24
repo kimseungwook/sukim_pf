@@ -1,0 +1,10 @@
+apiVersion: ingress.oraclecloud.com/v1beta1
+kind: IngressClassParameters
+metadata:
+  name: noco-ingress-params
+  namespace: nocodb
+spec:
+  loadBalancerName: "nocodb"
+  isPrivate: false
+  minBandwidthMbps: 10
+  maxBandwidthMbps: 10

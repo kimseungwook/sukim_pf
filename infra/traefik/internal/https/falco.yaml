@@ -1,0 +1,36 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: falco-internal-http
+  namespace: traefik
+spec:
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: Host(`gdfc.go-intern.io`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - name: goyo-falco-falcosidekick-ui
+          namespace: falco
+          port: 2802
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: falco-internal-https
+  namespace: traefik
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`gdfc.go-intern.io`)
+      priority: 10
+      services:
+        - name: goyo-falco-falcosidekick-ui
+          namespace: falco
+          port: 2802
+  tls: 
+    secretName: goyoai-web-backoffice-tls

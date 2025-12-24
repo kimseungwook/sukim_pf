@@ -1,0 +1,9 @@
+apiVersion: operator.tekton.dev/v1alpha1
+kind: TektonResult
+metadata:
+  name: result
+spec:
+  targetNamespace: tekton-pipelines
+  db:
+    # 핵심: 이미지 앞에 docker.io/ 를 붙여줍니다.
+    image: docker.io/bitnami/postgresql@sha256:ac8dd0d6512c4c5fb146c16b1c5f05862bd5f600d73348506ab4252587e7fcc6

@@ -1,0 +1,116 @@
+# manifest-update-task.yaml
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: {{ .Values.project_name | default .Chart.Name }}-manifest-update
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: container-registry-url
+      type: string
+    - name: commit-message
+      type: string
+    - name: image-tag
+      type: string
+      description: "Complete image tag from Harbor webhook (e.g., 2.5.0-a1b2c3d4-x7k9m2n5)"
+    - name: kustomize-giturl
+      type: string
+      default: {{ .Values.kustomize_git_url }}
+    - name: project-name
+      type: string
+      default: {{ .Values.project_name | default .Chart.Name }}
+    - name: module-name
+      type: string
+      description: "The full module name including namespace (e.g., gointern/goyoai-gointern-system)"
+    - name: kustomize-git-branch
+      type: string
+      default: "dev"
+    - name: kustomize-overlay-path
+      type: string
+      default: "overlays/dev"
+      
+  workspaces:
+    - name: {{ .Values.project_name | default .Chart.Name }}
+  steps:
+    - name: clean-workspace
+      image: {{ .Values.common_alpine_url }}
+      script: |
+        #!/bin/sh
+        WORKSPACE_PATH=$(workspaces.{{ .Values.project_name | default .Chart.Name }}.path)
+        PROJECT_DIR=$WORKSPACE_PATH/$(params.project-name)-manifest
+        mkdir -p $PROJECT_DIR
+        rm -rf $PROJECT_DIR/.[!.]* $PROJECT_DIR/*
+        echo "Workspace cleaned at $PROJECT_DIR"
+    
+    - name: setup-kustomize-environment
+      image: {{ .Values.common_alpine_git_url }}
+      script: |
+        #!/bin/sh
+        set -e
+        WORKSPACE_PATH=$(workspaces.{{ .Values.project_name | default .Chart.Name }}.path)
+        PROJECT_DIR=$WORKSPACE_PATH/$(params.project-name)-manifest
+        GIT_ROOT_PATH=$PROJECT_DIR
+        
+        MODULE_NAME="$(params.module-name)"
+        KUSTOMIZE_MODULE_NAME=${MODULE_NAME##*/}
+        
+        KUSTOMIZE_DIR="$KUSTOMIZE_MODULE_NAME/$(params.kustomize-overlay-path)"
+        DEPLOYMENT_NAME="$KUSTOMIZE_MODULE_NAME"
+        KUSTOMIZE_BRANCH="$(params.kustomize-git-branch)"
+
+        echo "Full Module (for image): $MODULE_NAME"
+        echo "Kustomize Module (for git): $KUSTOMIZE_MODULE_NAME"
+        echo "Kustomize Directory: $KUSTOMIZE_DIR"
+        echo "Deployment Name: $DEPLOYMENT_NAME"
+        echo "Kustomize Git Branch: $KUSTOMIZE_BRANCH"
+        
+        git config --global user.name "goyoai"
+        git config --global user.email "goyo-service_run@goyoai.com"
+        
+        if [ ! -d "$GIT_ROOT_PATH/.git" ]; then
+          git clone --branch $KUSTOMIZE_BRANCH $(params.kustomize-giturl) $GIT_ROOT_PATH
+        else
+          git -C $GIT_ROOT_PATH fetch origin
+          if ! git -C $GIT_ROOT_PATH rev-parse --verify --quiet $KUSTOMIZE_BRANCH; then
+            git -C $GIT_ROOT_PATH checkout -b $KUSTOMIZE_BRANCH
+          else
+            git -C $GIT_ROOT_PATH checkout $KUSTOMIZE_BRANCH
+          fi
+          git -C $GIT_ROOT_PATH reset --hard origin/$KUSTOMIZE_BRANCH
+        fi
+        
+        OVERLAY_PATH="$GIT_ROOT_PATH/$KUSTOMIZE_DIR"
+        mkdir -p $OVERLAY_PATH
+        cd $OVERLAY_PATH
+        
+        # deployment_patches.yaml 생성
+        cat <<EOF > deployment_patches.yaml
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: $DEPLOYMENT_NAME
+        spec:
+          template:
+            spec:
+              containers:
+                - name: ${DEPLOYMENT_NAME}-container
+                  image: $(params.container-registry-url)/$(params.module-name):$(params.image-tag)
+        EOF
+        
+        git add deployment_patches.yaml
+        COMMIT_MESSAGE="$(params.commit-message) - $(params.module-name):$(params.image-tag)"
+        git commit -m "$COMMIT_MESSAGE" || echo "No changes to commit"
+        git push --force-with-lease origin $KUSTOMIZE_BRANCH
+    
+    - name: manifest-push-end
+      image: {{ .Values.common_alpine_url }}
+      script: |
+        #!/bin/sh
+        apk add --no-cache curl
+        SLACK_WEBHOOK_URL="{{ .Values.slack_webhook_url }}"
+        
+        SLACK_MESSAGE="✅ Manifest updated: $(params.module-name):$(params.image-tag)"
+        curl -X POST -H 'Content-type: application/json' \
+        --data '{"text":"'"$SLACK_MESSAGE"'"}' \
+        $SLACK_WEBHOOK_URL

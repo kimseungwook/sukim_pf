@@ -1,0 +1,127 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: goyoai-web-frontend-web-manifest
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: replicas
+      type: string
+      default: "4"
+    - name: cpu_request
+      type: string
+      default: "300m"
+    - name: memory_request
+      type: string
+      default: "500Mi"
+    - name: cpu_limit
+      type: string
+      default: "1000m"
+    - name: memory_limit
+      type: string
+      default: "2Gi"
+    - name: ocir-url
+      type: string
+    - name: commit-message
+      type: string
+    - name: kustomize-revision
+      type: string
+      default: "goyoai-web-front"
+    - name: kustomize-giturl
+      type: string
+      default: https://github.com/GoyoAi-Service/goyoai-web-manifest
+    - name: project-name
+      type: string
+      default: goyoai-web-front
+    - name: timestamp
+      type: string
+    - name: git-short-sha
+      type: string
+  workspaces:
+    - name: goyoai-web-frontend-web
+  steps:
+    - name: clean-workspace
+      image: icn.ocir.io/cn7ipyag4bte/alpine-linux:64.3.19.1
+      # image: alpine
+      script: |
+        #!/bin/sh
+        WORKSPACE_PATH=$(workspaces.goyoai-web-frontend-web.path)
+        PROJECT_DIR=$WORKSPACE_PATH/$(params.project-name)-manifest
+        # Create project directory if not exists
+        mkdir -p $PROJECT_DIR
+        # Clean the workspace
+        rm -rf $PROJECT_DIR/.[!.]* $PROJECT_DIR/*
+        if [ "$(ls -A $PROJECT_DIR)" ]; then
+          echo "Project directory is not empty after cleaning."
+          ls -al $PROJECT_DIR
+          exit 1
+        else
+          echo "Project directory is now clean."
+        fi
+
+    - name: setup-kustomize-environment
+      image: icn.ocir.io/cn7ipyag4bte/alpine-git:64.2.43.0
+      script: |
+        #!/bin/sh
+        set -e
+        WORKSPACE_PATH=$(workspaces.goyoai-web-frontend-web.path)
+        PROJECT_DIR=$WORKSPACE_PATH/$(params.project-name)-manifest
+        GIT_ROOT_PATH=$PROJECT_DIR
+
+        # Configure Git
+        git config --global user.name "goyoai"
+        git config --global user.email "goyo-service_run@goyoai.com"
+
+        # Clone the repository or fetch the latest changes
+        if [ ! -d "$GIT_ROOT_PATH/.git" ]; then
+          git clone --branch $(params.kustomize-revision) $(params.kustomize-giturl) $GIT_ROOT_PATH
+        else
+          git -C $GIT_ROOT_PATH fetch origin
+          git -C $GIT_ROOT_PATH checkout $(params.kustomize-revision) || git -C $GIT_ROOT_PATH checkout -b $(params.kustomize-revision)
+          git -C $GIT_ROOT_PATH reset --hard origin/$(params.kustomize-revision)
+        fi
+
+        # Navigate to the overlay directory to perform file operations
+        OVERLAY_PATH="$GIT_ROOT_PATH/$(params.kustomize-revision)/overlays/dev"
+        mkdir -p $OVERLAY_PATH
+        cd $OVERLAY_PATH
+        rm -rf $OVERLAY_PATH/*
+        echo "Overlay path is ready."
+        # Navigate to the overlay directory to perform file operations
+
+        # Update the Kustomize overlay files        
+        cat <<EOF > deployment_patches.yaml
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: goyoai-web-front
+        spec:
+          template:
+            spec:
+              containers:
+                - name: goyoai-web-front-container
+                  image: $(params.ocir-url):$(params.git-short-sha)-$(params.timestamp)
+        EOF
+
+        # Stage, commit, and push the changes
+        git add deployment_patches.yaml
+        COMMIT_MESSAGE="$(params.commit-message) with new image tag $(params.git-short-sha)-$(params.timestamp)"
+        git commit -m "$COMMIT_MESSAGE"
+        git push --force-with-lease origin $(params.kustomize-revision)
+
+    - name: manifest-push-end
+      image: icn.ocir.io/cn7ipyag4bte/alpine-linux:64.3.19.1
+      # image: alpine
+      script: |
+        #!/bin/sh
+        # Curl
+        apk add --no-cache curl
+        echo "Listing files in $(workspaces.goyoai-web-frontend-web.path):"
+        ls -al $(workspaces.goyoai-web-frontend-web.path)
+        
+        SLACK_WEBHOOK_URL="https://hooks.slack.com/services/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"
+        
+        SLACK_MESSAGE="$(params.project-name) Image repository Push!"
+        curl -X POST -H 'Content-type: application/json' \
+        --data '{"text":"'"$SLACK_MESSAGE"'"}' \
+        $SLACK_WEBHOOK_URL

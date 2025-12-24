@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: goyoai-homepage-pdb
+  namespace: goyoai-web
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: goyoai-web-page      

@@ -17,7 +17,7 @@ export SUPPRESS_LABEL_WARNING=True
 OCI_PROFILE="bastion"
 OCI_REGION="ap-seoul-1" # 로그인 및 리전 지정에 사용할 변수
 
-BASTION_OCID="ocid1.bastion.oc1.ap-seoul-1.amaaaaaacgj7s5ya4ar52elr4cp2o55ixi7alje5eh2vpag2uqa3d25klaxq"
+BASTION_OCID="ocid1.bastion.oc1.ap-seoul-1.amaaaaaacgj7s5yaj2puqa6437l7xxeg5lsr3iztt6hhn42lbutfisdp25na"
 DISPLAY_NAME="sukim-pf
 TARGET_IP="10.200.10.2"
 TARGET_PORT="6443"

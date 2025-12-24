@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: tekton-trigger-back-portal-tls
+  namespace: tekton-pipelines
+spec:
+  secretName: tekton-trigger-back-portal-tls
+  issuerRef:
+    name: tekton-dev
+    kind: ClusterIssuer
+  dnsNames:
+    - gdwbackportaldev.goyoai.com

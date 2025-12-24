@@ -1,0 +1,76 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: {{ .Values.project_name }}-git-clone
+  namespace: tekton-pipelines
+spec:
+  workspaces:
+    - name: {{ .Values.project_name }}
+  params:
+    - name: revision
+      type: string
+    - name: giturl
+      type: string
+    - name: project-name
+      type: string
+      default: {{ .Values.project_name }}
+    - name: module-name
+      type: string
+      description: "The module to build"
+  results:
+    - name: commit
+      description: The git commit hash
+  steps:
+    - name: clean-workspace
+      image: {{ .Values.common_alpine_url }}
+      script: |
+        #!/bin/sh
+        WORKSPACE_PATH=$(workspaces.{{ .Values.project_name }}.path)
+        MODULE_DIR=$WORKSPACE_PATH/$(params.module-name)
+        PROJECT_DIR=$MODULE_DIR/source
+        
+        # Create project directory if not exists
+        mkdir -p $PROJECT_DIR
+        # Clean the workspace
+        rm -rf $PROJECT_DIR/.[!.]* $PROJECT_DIR/*
+        if [ "$(ls -A $PROJECT_DIR)" ]; then
+          echo "Project directory is not empty after cleaning."
+          ls -al $PROJECT_DIR
+          exit 1
+        else
+          echo "Project directory is now clean."
+        fi
+    - name: clone-repository
+      image: {{ .Values.common_alpine_git_url }}
+      script: |
+        #!/bin/sh
+        WORKSPACE_PATH=$(workspaces.{{ .Values.project_name }}.path)
+        MODULE_DIR=$WORKSPACE_PATH/$(params.module-name)
+        PROJECT_DIR=$MODULE_DIR/source
+        
+        mkdir -p $PROJECT_DIR
+        git config --global --add safe.directory $PROJECT_DIR
+        # Clone the repository
+        git clone -b $(params.revision) $(params.giturl) $PROJECT_DIR
+        cd $PROJECT_DIR
+        # Capture commit hash
+        git rev-parse --short HEAD > $(results.commit.path)
+
+    - name: list-files
+      image: {{ .Values.common_alpine_url }}
+      script: |
+        #!/bin/sh
+        WORKSPACE_PATH=$(workspaces.{{ .Values.project_name }}.path)
+        MODULE_DIR=$WORKSPACE_PATH/$(params.module-name)
+        PROJECT_DIR=$MODULE_DIR/source
+        echo "Listing files in $PROJECT_DIR :"
+        ls -al $PROJECT_DIR      
+    # - name: notify-slack
+    #   image: alpine
+    #   script: |
+    #     #!/bin/sh
+    #     apk add --no-cache curl
+    #     SLACK_WEBHOOK_URL="{{ .Values.common_alpine_git_url }}"
+    #     # 슬랙 메시지 내용
+    #     SLACK_MESSAGE="$(params.project-name) Git Clone 완료"
+    #     curl -X POST -H 'Content-type: application/json' --data '{"text":"'"$SLACK_MESSAGE"'"}' $SLACK_WEBHOOK_URL

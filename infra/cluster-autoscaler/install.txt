@@ -1,0 +1,4 @@
+wget https://raw.githubusercontent.com/kubernetes/autoscaler/master/cluster-autoscaler/cloudprovider/oci/examples/oci-nodepool-cluster-autoscaler-w-principals.yaml -O cluster-autoscaler.yaml
+#파일 수정
+
+k apply -f cluster-autoscaler/cluster-autoscaler.yaml 

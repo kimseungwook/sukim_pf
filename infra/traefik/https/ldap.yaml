@@ -1,0 +1,29 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: ldap-https
+  namespace: traefik
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`gdlp.goyoai.com`)
+      services:
+        - name: goyo-ldap
+          namespace: ldap
+          port: 389
+    - kind: Rule
+      match: Host(`gdltb.goyoai.com`)
+      services:
+        - name: goyo-ldap-ltb-passwd
+          namespace: ldap
+          port: 80
+    - kind: Rule
+      match: Host(`gdpla.goyoai.com`)
+      services:
+        - name: goyo-ldap-phpldapadmin
+          namespace: ldap
+          port: 80
+  tls:
+    secretName: goyo-ldap-tls

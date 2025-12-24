@@ -1,0 +1,47 @@
+logs:
+  general:
+    level: DEBUG  # Sets the log level to DEBUG
+
+service:
+  enabled: true
+  single: true  # Uses a single service for both TCP and UDP when set to true
+  type: LoadBalancer
+  annotations:
+    oci.oraclecloud.com/load-balancer-type: "lb"
+    oci.oraclecloud.com/oci-network-security-groups: "ocid1.networksecuritygroup.oc1.ap-seoul-1.aaaaaaaaovtx5cmterqlmsnh66tydq54wwgj6uigm67p4vpytwrhpmxoqbjq"
+    service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: "None"
+    service.beta.kubernetes.io/oci-load-balancer-shape: "flexible"
+    service.beta.kubernetes.io/oci-load-balancer-shape-flex-min: "10"
+    service.beta.kubernetes.io/oci-load-balancer-shape-flex-max: "10"
+    # service.beta.kubernetes.io/oci-load-balancer-tls-backendset-secret: nocodb/noco-tls-secret
+    oci.oraclecloud.com/node-label-selector: service=tools
+    oci.oraclecloud.com/initial-freeform-tags-override: '{"Name": "tekton"}'
+    service.beta.kubernetes.io/oci-load-balancer-ssl-ports: "443"
+    # service.beta.kubernetes.io/oci-load-balancer-tls-secret: tekton-pipelines/tekton-dashboard-tls
+    # service.beta.kubernetes.io/oci-load-balancer-backend-protocol: "HTTP"
+    
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: "service"
+          operator: In
+          values: 
+          - "tools"
+
+providers:
+  kubernetesIngress:
+    namespaces:
+    - tekton-pipelines  # Specifies that Traefik should only monitor the 'nocodb' namespace
+# ports:
+#   web:
+#     expose: true
+#     port: 8000
+# #     targetPort: 80
+#     protocol: TCP
+#   websecure:
+#     expose: true
+#     port: 8443
+#     # targetPort: 80
+#     protocol: TCP

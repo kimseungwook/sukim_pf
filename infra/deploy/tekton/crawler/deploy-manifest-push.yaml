@@ -1,0 +1,129 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: goyoai-backend-crawler-manifest
+  namespace: tekton-pipelines
+  labels:
+    goyo-svc: goyoai-backend-crawler  
+spec:
+  params:
+    - name: replicas
+      type: string
+      default: "4"
+    - name: cpu_request
+      type: string
+      default: "200m"
+    - name: memory_request
+      type: string
+      default: "1G"
+    - name: cpu_limit
+      type: string
+      default: "1000m"
+    - name: memory_limit
+      type: string
+      default: "3Gi"
+    - name: ocir-url
+      type: string
+    - name: commit-message
+      type: string
+    - name: kustomize-revision
+      type: string
+      default: "goyoai-backend-crawler"
+    - name: kustomize-giturl
+      type: string
+      default: https://github.com/GoyoAi-Service/goyoai-web-manifest
+    - name: project-name
+      type: string
+      default: goyoai-backend-crawler
+    - name: timestamp
+      type: string
+    - name: git-short-sha
+      type: string
+  workspaces:
+    - name: goyoai-backend-crawler
+  steps:
+    - name: clean-workspace
+      image: icn.ocir.io/cn7ipyag4bte/alpine-linux:64.3.19.1
+      # image: alpine
+      script: |
+        #!/bin/sh
+        WORKSPACE_PATH=$(workspaces.goyoai-backend-crawler.path)
+        PROJECT_DIR=$WORKSPACE_PATH/$(params.project-name)-manifest
+        # Create project directory if not exists
+        mkdir -p $PROJECT_DIR
+        # Clean the workspace
+        rm -rf $PROJECT_DIR/.[!.]* $PROJECT_DIR/*
+        if [ "$(ls -A $PROJECT_DIR)" ]; then
+          echo "Project directory is not empty after cleaning."
+          ls -al $PROJECT_DIR
+          exit 1
+        else
+          echo "Project directory is now clean."
+        fi
+
+    - name: setup-kustomize-environment
+      image: icn.ocir.io/cn7ipyag4bte/alpine-git:64.2.43.0
+      # image: alpine/git
+      script: |
+        #!/bin/sh
+        set -e
+        WORKSPACE_PATH=$(workspaces.goyoai-backend-crawler.path)
+        PROJECT_DIR=$WORKSPACE_PATH/$(params.project-name)-manifest
+        GIT_ROOT_PATH=$PROJECT_DIR
+
+        # Configure Git
+        git config --global user.name "bbrick"
+        git config --global user.email "sukim@bbrick.com"
+
+        # Clone the repository or fetch the latest changes
+        if [ ! -d "$GIT_ROOT_PATH/.git" ]; then
+          git clone --branch $(params.kustomize-revision) $(params.kustomize-giturl) $GIT_ROOT_PATH
+        else
+          git -C $GIT_ROOT_PATH fetch origin
+          git -C $GIT_ROOT_PATH checkout $(params.kustomize-revision) || git -C $GIT_ROOT_PATH checkout -b $(params.kustomize-revision)
+          git -C $GIT_ROOT_PATH reset --hard origin/$(params.kustomize-revision)
+        fi
+
+        # Navigate to the overlay directory to perform file operations
+        OVERLAY_PATH="$GIT_ROOT_PATH/$(params.kustomize-revision)/overlays/dev"
+        mkdir -p $OVERLAY_PATH
+        cd $OVERLAY_PATH
+        rm -rf $OVERLAY_PATH/*
+        echo "Overlay path is ready."
+        # Navigate to the overlay directory to perform file operations
+
+        # Update the Kustomize overlay files        
+        cat <<EOF > deployment_patches.yaml
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: goyoai-backend-crawler
+        spec:
+          template:
+            spec:
+              containers:
+                - name: goyoai-backend-crawler-container
+                  image: $(params.ocir-url):$(params.git-short-sha)-$(params.timestamp)
+        EOF
+
+        # Stage, commit, and push the changes
+        git add  deployment_patches.yaml
+        COMMIT_MESSAGE="$(params.commit-message) with new image tag $(params.git-short-sha)-$(params.timestamp)"
+        git commit -m "$COMMIT_MESSAGE"
+        git push --force-with-lease origin $(params.kustomize-revision)
+
+    - name: manifest-push-end
+      image: icn.ocir.io/cn7ipyag4bte/alpine-linux:64.3.19.1
+      # image: alpine
+      script: |
+        #!/bin/sh
+        # Curl installation
+        apk add --no-cache curl
+
+        SLACK_WEBHOOK_URL="https://hooks.slack.com/services/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"
+        
+        SLACK_MESSAGE="운영 $(params.project-name) Image repository Push 완료"
+
+        curl -X POST -H 'Content-type: application/json' \
+        --data '{"text":"'"$SLACK_MESSAGE"'"}' \
+        $SLACK_WEBHOOK_URL

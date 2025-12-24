@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: goyo-tempo-gateway-tls
+  namespace: traefik
+spec:
+  secretName: goyo-tempo-gateway-tls
+  issuerRef:
+    name: goyoai-tools
+    kind: ClusterIssuer
+  dnsNames:
+    - gdtp.goyoai.com

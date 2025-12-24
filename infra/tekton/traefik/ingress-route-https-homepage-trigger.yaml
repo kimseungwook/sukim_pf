@@ -1,0 +1,17 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: tekton-trigger-homepage-https
+  namespace: tekton-pipelines
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`gdwhomepage.goyoai.com`)
+      priority: 20
+      services:
+        - name: el-goyoai-web-page
+          port: 8080
+  tls: 
+    secretName: tekton-trigger-homepage-tls

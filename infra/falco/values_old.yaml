@@ -1,0 +1,291 @@
+# OKE Development Environment - Minimal Configuration
+# Based on Falco Helm Chart Default Values with minimal OKE-specific changes
+
+###############################
+# General deployment settings #
+###############################
+
+image:
+  pullPolicy: IfNotPresent
+  registry: docker.io
+  repository: falcosecurity/falco
+  tag: ""
+
+# -- Add basic pod labels for identification
+podLabels:
+  environment: "development"
+  cluster: "oke-dev"
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+rbac:
+  create: true
+
+# -- OKE development environment resource settings
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1024Mi
+
+nodeSelector: {}
+affinity: {}
+
+# -- Remove tolerations for development environment (no master node restrictions)
+tolerations: []
+
+#########################
+# Scenario requirements #
+#########################
+
+controller:
+  kind: daemonset
+  annotations: {}
+  labels: {}
+  daemonset:
+    updateStrategy:
+      type: RollingUpdate
+
+# -- No additional services needed for basic setup
+services: []
+
+# -- Enable metrics for Prometheus monitoring
+metrics:
+  enabled: true
+  interval: 1h
+  outputRule: false
+  rulesCountersEnabled: true
+  resourceUtilizationEnabled: true
+  stateCountersEnabled: true
+  kernelEventCountersEnabled: true
+  libbpfStatsEnabled: true
+  convertMemoryToMB: true
+  includeEmptyValues: false
+  service:
+    create: true
+    type: ClusterIP
+
+# Driver settings - Use default auto selection
+driver:
+  enabled: true
+  kind: auto  # Let Falco choose the best driver automatically
+  loader:
+    enabled: true
+
+# Collectors - Use default settings (basic container metadata collection)
+collectors:
+  enabled: true
+  # Use default collector settings - they work with CRI-O out of the box
+  docker:
+    enabled: true
+  containerd:
+    enabled: true
+  crio:
+    enabled: true
+  # Disable new containerEngine to avoid conflicts
+  containerEngine:
+    enabled: false
+  # Disable kubernetes metadata collector for now
+  kubernetes:
+    enabled: false
+
+########################
+# Falco integrations   #
+########################
+
+# -- Enable Falcosidekick for enhanced monitoring and UI
+falcosidekick:
+  enabled: true
+  fullfqdn: false
+  listenPort: ""
+  # Enable Falcosidekick UI for web dashboard
+  webui:
+    enabled: true
+  # OKE development environment configuration
+  config:
+    prometheus:
+      # Prometheus-compatible labels (no hyphens)
+      extralabels: "environment:development,cluster_name:oke_dev"
+    # Add more outputs as needed later
+    # slack:
+    #   webhookurl: ""
+    # teams:
+    #   webhookurl: ""
+
+####################
+# falcoctl config  #
+####################
+falcoctl:
+  image:
+    pullPolicy: IfNotPresent
+    registry: docker.io
+    repository: falcosecurity/falcoctl
+    tag: "0.11.2"
+  artifact:
+    install:
+      enabled: true
+      args: ["--log-format=json"]
+    follow:
+      enabled: true
+      args: ["--log-format=json"]
+  config:
+    indexes:
+      - name: falcosecurity
+        url: https://falcosecurity.github.io/falcoctl/index.yaml
+    artifact:
+      allowedTypes:
+        - rulesfile
+        # Remove plugin type to avoid plugin installation issues
+      install:
+        resolveDeps: true
+        refs: [falco-rules:4]  # Only install basic rules
+        rulesfilesDir: /rulesfiles
+        pluginsDir: /plugins
+      follow:
+        refs: [falco-rules:4]
+        every: 6h
+        falcoversions: http://localhost:8765/versions
+        rulesfilesDir: /rulesfiles
+        pluginsDir: /plugins
+
+######################
+# falco.yaml config  #
+######################
+falco:
+  # -- Use default rules files
+  rules_files:
+    - /etc/falco/falco_rules.yaml
+    - /etc/falco/falco_rules.local.yaml
+    - /etc/falco/rules.d
+
+  # -- No plugins for basic setup
+  load_plugins: []
+  plugins: []
+
+  # -- Basic configuration
+  watch_config_files: true
+  priority: debug
+  
+  # -- Enable JSON output for OCI Logs integration
+  json_output: true
+  json_include_output_property: true
+  json_include_tags_property: true
+  json_include_output_fields_property: true
+  
+  buffered_outputs: false
+
+  ##########################
+  # Falco outputs channels #
+  ##########################
+
+  stdout_output:
+    enabled: true
+
+  syslog_output:
+    enabled: true
+
+  file_output:
+    enabled: false
+
+  http_output:
+    enabled: false
+
+  # -- Enable gRPC output for Falcosidekick communication
+  grpc_output:
+    enabled: true
+
+  ##########################
+  # Falco exposed services #
+  ##########################
+
+  # -- Enable gRPC server for Falcosidekick communication
+  grpc:
+    enabled: true
+    bind_address: "unix:///run/falco/falco.sock"
+    threadiness: 0
+
+  # -- Enable webserver for health checks and metrics
+  webserver:
+    enabled: true
+    threadiness: 0
+    listen_port: 8765
+    k8s_healthz_endpoint: /healthz
+    prometheus_metrics_enabled: true
+    ssl_enabled: false
+
+  ##############################################################################
+  # Basic logging settings #
+  ##############################################################################
+
+  log_stderr: true
+  log_syslog: true
+  log_level: info
+
+  libs_logger:
+    enabled: true
+    severity: info
+
+  output_timeout: 2000
+
+  syscall_event_drops:
+    threshold: .1
+    actions:
+      - log
+      - alert
+    rate: .03333
+    max_burst: 1
+    simulate_drops: false
+
+  # -- Enable basic metrics
+  metrics:
+    enabled: true
+    interval: 1h
+    output_rule: false
+    rules_counters_enabled: true
+    resource_utilization_enabled: true
+    state_counters_enabled: true
+    kernel_event_counters_enabled: true
+    libbpf_stats_enabled: true
+    convert_memory_to_mb: true
+    include_empty_values: false
+
+  base_syscalls:
+    custom_set: []
+    repair: false
+
+  falco_libs:
+    thread_table_size: 262144
+
+  # -- Basic container engines (works with CRI-O)
+  container_engines:
+    docker:
+      enabled: false
+    cri:
+      enabled: true
+      sockets:
+        ["/run/crio/crio.sock"]
+      disable_async: false
+    podman:
+      enabled: false
+    lxc:
+      enabled: false
+    libvirt_lxc:
+      enabled: false
+    bpm:
+      enabled: false
+
+# -- No custom rules for basic setup
+customRules: {}
+
+# -- Enable ServiceMonitor for Prometheus Operator
+serviceMonitor:
+  create: true
+  labels:
+    prometheus: kube-prometheus
+  interval: 15s
+  scrapeTimeout: 10s

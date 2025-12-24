@@ -1,0 +1,26 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: nocodb-ingressroute
+  namespace: nocodb # 또는 해당 서비스가 위치한 네임스페이스
+spec:
+  entryPoints:
+    - web # 이는 Traefik의 엔트리 포인트를 참조합니다. 해당 설정에 맞게 조정해야 합니다.
+    - websecure
+  # routes:
+    # - kind: Rule
+    #   match: Host(`noco.bbrick.com`)
+    #   services:
+    #     - name: nocodb
+    #       namespace: nocodb # 또는 해당 서비스가 위치한 네임스페이스
+    #       port: 8080
+  routes:
+    - kind: Rule
+      match: Host(`noco.bbrick.com`) && PathPrefix(`/`)  # Specify the desired path
+      services:
+        - name: nocodb
+          namespace: nocodb  # Ensure this is the namespace where your service is located
+          port: 8080
+  # 필요한 경우, 해당 요청에 대한 Traefik 미들웨어를 여기에 정의할 수 있습니다.
+  tls:
+    certResolver: le

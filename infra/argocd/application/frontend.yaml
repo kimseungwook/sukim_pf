@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: goyoai-web-front
+spec:
+  destination:
+    name: ''
+    namespace: goyoai-web
+    server: https://kubernetes.default.svc
+  source:
+    path: 'goyoai-web-front-react/overlays/az_prod'
+    repoURL: https://github.com/GoyoAi-Service/goyoai-web-manifest
+    targetRevision: 'goyoai-web-front-react'
+  sources: []
+  project: goyoai-web
+  syncPolicy:
+    automated: null
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+      - ServerSideApply=true

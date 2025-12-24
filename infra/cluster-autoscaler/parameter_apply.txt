@@ -1,0 +1,1 @@
+oci ce cluster update-addon --addon-name ClusterAutoscaler --from-json file://./cluster-autoscaler/param.json --cluster-id ocid1.cluster.oc1.ap-seoul-1.aaaaaaaal6hi72xwaw3fzr3metnwbtv3gkjfpfdpbfnlles6bcayeatsm6za

@@ -1,0 +1,95 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: hyper-report-backend-relay
+  namespace: tekton-pipelines
+spec:
+  serviceAccountName: tekton-triggers-sa
+  resources:
+    kubernetesResource:
+      spec:
+        template:
+          spec:
+            nodeSelector:
+              service: "tools"
+            containers:
+              - resources:
+                  requests:
+                    memory: "64Mi"
+                    cpu: "250m"
+                  limits:
+                    memory: "128Mi"
+                    cpu: "500m"
+  triggers:
+    - name: hyper-report-backend-relay-push
+      interceptors:
+        - ref:
+            name: "github"
+          params:
+            - name: "eventTypes"
+              value: ["push"]
+        - ref:
+            name: "cel"
+          params: #header.match('X-GitHub-Event', 'push'), 
+            - name: "filter"
+              value: "body.ref.split('/')[2] in ['qa_1st']"
+            - name: "overlays"
+              value:
+                - key: sha
+                  expression: "body.head_commit.id"
+                - key: short_sha
+                  expression: "body.head_commit.id.truncate(7)"
+                - key: branch_name
+                  expression: "body.ref.split('/')[2]"
+                - key: deploy_env
+                  expression: "{\"qa_1st\": \"staging\"}[string(body.ref.split('/')[2])]"
+      bindings:
+        - ref: hyper-report-backend-relay
+      template:
+        ref: hyper-report-backend-relay
+    - name: hyper-report-backend-relay-pr-open
+      interceptors:
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: "body.action in ['opened', 'synchronize', 'reopened', 'labeled'] && body.pull_request.labels.exists(k, k.name=='deploy')"
+            - name: "overlays"
+              value:
+                - key: sha
+                  expression: "body.pull_request.head.sha"
+                - key: short_sha
+                  expression: "body.pull_request.head.sha.truncate(7)"
+                - key: branch_name
+                  expression: "body.pull_request.head.ref"
+                - key: deploy_env
+                  expression: "'pr-' + string(body.pull_request.number)"
+        - ref:
+            name: "github"
+          params:
+            - name: "eventTypes"
+              value: ["pull_request"]
+      bindings:
+        - ref: hyper-report-backend-relay
+      template:
+        ref: hyper-report-backend-relay
+    - name: hyper-report-backend-relay-pr-close
+      interceptors:
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: "body.action == 'closed' || (body.action == 'unlabeled' && body.label.name == 'deploy')"
+            - name: "overlays"
+              value:
+                - key: deploy_env
+                  expression: "'pr-' + string(body.pull_request.number)"
+        - ref:
+              name: "github"
+          params:
+            - name: "eventTypes"
+              value: ["pull_request"]
+      bindings:
+        - ref: hyper-report-backend-relay
+      template:
+        ref: hyper-report-backend-relay-trigger-template

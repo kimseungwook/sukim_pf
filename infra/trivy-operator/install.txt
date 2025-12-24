@@ -1,0 +1,4 @@
+helm repo add trivy-operator https://aquasecurity.github.io/helm-charts/
+
+version 0.31.0
+helm upgrade --install goyo-trivy-operator trivy-operator/trivy-operator -f trivy-operator/values.yaml -n trivy --create-namespace

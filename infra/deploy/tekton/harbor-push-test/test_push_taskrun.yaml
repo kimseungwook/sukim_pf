@@ -1,0 +1,19 @@
+apiVersion: tekton.dev/v1beta1
+kind: TaskRun
+metadata:
+  name: harbor-nginx-image-build-run
+  namespace: tekton-pipelines
+spec:
+  taskRef:
+    name: harbor-nginx-image-build
+  params:
+    - name: image-tag
+      value: "20230530-1"
+  workspaces:
+    - name: source
+      persistentVolumeClaim:
+        claimName: goyoai-web-back
+    - name: dockerconfig
+      secret:
+        secretName: harborcred
+  serviceAccountName: tekton-ci-token

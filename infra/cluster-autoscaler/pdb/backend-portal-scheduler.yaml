@@ -1,0 +1,13 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: goyoai-web-back-portal-scheduler-pdb
+  namespace: goyoai-web
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: goyoai-web-back-portal-scheduler-app
+      
+      
+      

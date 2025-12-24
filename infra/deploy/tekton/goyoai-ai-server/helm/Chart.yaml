@@ -1,0 +1,6 @@
+apiVersion: v2
+name: goyoai-ai-server
+description: A Helm chart for Goyoai AI Server
+type: application
+version: 0.1.3
+appVersion: 1.16.0

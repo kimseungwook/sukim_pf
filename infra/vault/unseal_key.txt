@@ -1,0 +1,52 @@
+Unseal Key 1: h9Pts7MnMMhQokCvt904ELUx4EKo6gPXYuseP8C4KYlT
+Unseal Key 2: z2UL53d6Y1EX9Su0FQ1lkK39qqxAKyfKCtHKqO+HK4eA
+Unseal Key 3: fFNgIJuYuw77pB+RQBBcRUK6YopkE/FRSbBsWXZLqae3
+Unseal Key 4: itg3BRwW0YaXarJfC0BDCvt3LBXRtLfsWb6rZUPtQHlV
+Unseal Key 5: /WMZARBNPirpj8IsEhkZLMyCTIcs57DYkIxTQiZsAnHF
+
+Initial Root Token: hvs.XSHNPneF6Cea4Qcxa34B8Q51
+
+vault write auth/oidc/config \
+oidc_discovery_url="https://gdauth.goyoai.com/application/o/vault/" \
+oidc_client_id="RBuj7nuz3ZlmJFhZr2DK9Qmx8NSoOvQhdoeZiAyx" \
+oidc_client_secret="wF8LUUTFylou8V0xmSpqcffAtrtzspSVahwHHXykvIXSq2RDiHcmbYMzkAaRfhTXpB9dtPefaRhFHlXalVPJTUiyRH21zzuza5iabGB0X8SDAFPmnFfhb5zYtKNsUVAY" \
+default_role="reader"
+
+vault write auth/oidc/role/ak-reader \
+      bound_audiences="RBuj7nuz3ZlmJFhZr2DK9Qmx8NSoOvQhdoeZiAyx" \
+      allowed_redirect_uris="https://gdvt.goyoai.com/ui/vault/auth/oidc/oidc/callback" \
+      allowed_redirect_uris="https://gdvt.goyoai.com/oidc/callback" \
+      allowed_redirect_uris="http://localhost:8250/oidc/callback" \
+      user_claim="sub" \
+      policies="authentik-reader"
+vault write auth/oidc/role/vault-admins \
+      bound_audiences="RBuj7nuz3ZlmJFhZr2DK9Qmx8NSoOvQhdoeZiAyx" \
+      allowed_redirect_uris="https://gdvt.goyoai.com/ui/vault/auth/oidc/oidc/callback" \
+      allowed_redirect_uris="https://gdvt.goyoai.com/oidc/callback" \
+      allowed_redirect_uris="http://localhost:8250/oidc/callback" \
+      user_claim="sub" \
+      policies="authentik-reader" \
+      groups_claim="groups" \
+      oidc_scopes=[ "openid profile email" ]
+
+vault write auth/oidc/role/reader \
+      bound_audiences="qxxXWQO0RpDEXVO2sDffL3S69YVzbf0aenKsnal6" \
+      allowed_redirect_uris="https://gdvt.goyoai.com/ui/vault/auth/oidc/oidc/callback" \
+      allowed_redirect_uris="https://gdvt.goyoai.com/oidc/callback" \
+      allowed_redirect_uris="http://localhost:8250/oidc/callback" \
+      user_claim="sub" \
+      policies="reader" \
+      groups_claim="groups" \
+      oidc_scopes="openid profile email"
+
+vault write identity/group \
+    name="vault-admins" \
+    policies="gointer-dev-policy" \
+    type="external" \
+    metadata= \
+    responsibility="Admin access to Vault"
+
+vault write identity/group-alias \
+    mount_accessor="auth_oidc_fe621fbb" \
+    canonical_id="7e68ca7d-69f0-42d2-eca7-807d0b51da7d" \
+    name="vault-admins"

@@ -1,0 +1,25 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: frontend-traefik-scaler
+  namespace: goyoai-web
+spec:
+  scaleTargetRef:
+    name: front-traefik
+    kind: Deployment
+  pollingInterval: 15
+  cooldownPeriod: 300
+  minReplicaCount: 2
+  maxReplicaCount: 6  # 적절한 최대값 설정
+  triggers:
+  - type: prometheus
+    metadata:
+      serverAddress: "http://goyoai-prometheus-stack-ku-prometheus.prometheus.svc.cluster.local:9090"
+      metricName: frontend_traefik_count
+      threshold: "1"
+      query: |
+        (2 * (count(kube_node_labels{label_goyo_svc="frontend-web"}) < 2))
+        unless
+        (count(kube_node_labels{label_goyo_svc="frontend-web"}) >= 2)
+        or
+        (count(kube_node_labels{label_goyo_svc="frontend-web"}) + 1)

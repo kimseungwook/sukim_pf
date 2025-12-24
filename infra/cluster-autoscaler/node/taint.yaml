@@ -1,0 +1,16 @@
+# 이 파일은 Cluster Autoscaler가 새 노드를 생성할 때 적용할 taint를 정의합니다.
+apiVersion: v1
+kind: Node
+metadata:
+  name: placeholder-name  # 이 이름은 실제 노드 생성 시 자동으로 대체됩니다.
+spec:
+  taints:
+  # Frontend 워크로드를 위한 taint
+  - key: hyper-report
+    value: frontend-web
+    effect: NoSchedule  # 이 taint가 있는 노드에는 matching toleration이 없는 pod가 스케줄되지 않습니다.
+  # Backend 워크로드를 위한 taint
+  - key: hyper-report
+    value: backend-relay
+    effect: NoSchedule
+  # 참고: 실제 노드 생성 시 적절한 taint만 선택적으로 적용됩니다.

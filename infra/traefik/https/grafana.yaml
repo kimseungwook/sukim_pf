@@ -1,0 +1,26 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: grafana-https
+  namespace: traefik
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`gdgr.goyoai.com`)
+      priority: 10
+      services:
+        - name: goyo-grafana
+          namespace: lgtm
+          port: 80
+    - kind: Rule
+      match: Host(`gdgr.goyoai.com`) && PathPrefix(`/grpc`)
+      priority: 11
+      services:
+        - name: goyo-grafana
+          namespace: lgtm
+          port: 80
+          scheme: h2c
+  tls:
+    secretName: goyoai-webs-tls

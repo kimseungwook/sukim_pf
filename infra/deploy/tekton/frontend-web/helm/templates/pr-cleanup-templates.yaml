@@ -1,0 +1,59 @@
+# PR 정리용 추가 템플릿들
+
+# ✅ 1. PR 정리용 Trigger Binding
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: {{ .Values.project_name }}-cleanup
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: pr-number
+      value: $(extensions.pr_number)
+    - name: deploy-env
+      value: $(extensions.deploy_env)
+    - name: app-name
+      value: $(extensions.app_name)
+    - name: container-registry-url
+      value: "{{ .Values.container_registry_url }}"
+
+---
+# ✅ 2. PR 정리용 Trigger Template  
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: {{ .Values.project_name }}-pr-cleanup-template
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: pr-number
+      description: PR number to clean up
+    - name: deploy-env  
+      description: Environment to clean up
+    - name: app-name
+      description: App name
+    - name: container-registry-url
+      description: Container registry URL
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: TaskRun
+      metadata:
+        generateName: cleanup-$(tt.params.pr-number)-
+        namespace: tekton-pipelines
+      spec:
+        taskRef:
+          name: {{ .Values.project_name }}-pr-cleanup
+        params:
+          - name: pr-number
+            value: $(tt.params.pr-number)
+          - name: container-registry-url
+            value: $(tt.params.container-registry-url)
+        serviceAccountName: {{ .Values.git_serviceAccountName }}
+        podTemplate:
+          nodeSelector:
+            {{ .Values.trigger_node_selector_key }}: "{{ .Values.trigger_node_selector_value }}"
+          tolerations:
+          - key: "{{ .Values.trigger_tolerations_key }}"
+            operator: "{{ .Values.trigger_tolerations_operator }}"
+            value: "{{ .Values.trigger_tolerations_value }}"
+            effect: "{{ .Values.trigger_tolerations_effect }}"

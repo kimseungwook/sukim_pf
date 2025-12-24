@@ -1,0 +1,65 @@
+# Default values for cluster-autoscaler.
+# This is a YAML-formatted file.
+
+nameOverride: "hyper-report-qa-cluster-autoscaler"
+fullnameOverride: "hyper-report-qa-cluster-autoscaler"
+
+# Deployment 관련 설정
+replicaCount: 1
+
+# image:
+#   repository: iad.ocir.io/oracle/oci-cluster-autoscaler
+#   # tag는 실제 사용할 버전으로 교체해야 합니다.
+#   tag: "latest"
+#   pullPolicy: Always
+
+# 네임스페이스 설정
+namespace: cas
+
+# 노드 선택기 설정
+nodeSelector:
+  hyper-report: tools
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 300Mi
+  requests:
+    cpu: 100m
+    memory: 300Mi
+
+# Command 인자 설정
+extraArgs:
+  v: "4"
+  stderrthreshold: "info"
+  cloud-provider: "oci"
+  max-node-provision-time: "25m"
+  scale-down-delay-after-add: "10m"
+  scale-down-unneeded-time: "10m"
+  unremovable-node-recheck-timeout: "5m"
+  balance-similar-node-groups: "true"
+  balancing-ignore-label[0]: ["displayName", "hostname", "internal_addr", "oci.oraclecloud.com/fault-domain"]
+  balancing-ignore-label[0]:
+  nodes:[]
+    1:4:ocid1.nodepool.oc1.ap-seoul-1.aaaaaaaa5lgssff52lroxyg4rcmo2ohvt3dda6zni6liw67ldnpz7d67spvq,
+    1:4:ocid1.nodepool.oc1.ap-seoul-1.aaaaaaaak3e3nbytk2kjizykdbxfbxxjn656blkp5aqt5qxsvn5xo5fkpeeq,
+    1:4:ocid1.nodepool.oc1.ap-seoul-1.aaaaaaaa3urgt22vb5lswh57vzddggduhespyfshwd2fdubt4ntwxzk6lyaq
+
+# 환경 변수 설정
+extraEnv:
+  OKE_USE_INSTANCE_PRINCIPAL: "true"
+  OCI_SDK_APPEND_USER_AGENT: "oci-oke-cluster-autoscaler"
+
+rbac:
+  create: true
+  serviceAccount:
+    create: true
+    name: hyper-report-qa-cluster-autoscaler
+
+# Prometheus ServiceMonitor 설정 (선택사항)
+serviceMonitor:
+  enabled: false
+
+# Pod Disruption Budget 설정 (선택사항)
+podDisruptionBudget:
+  maxUnavailable: 1

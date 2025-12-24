@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: goyo-mimir-gateway-tls
+  namespace: traefik
+spec:
+  secretName: goyo-mimir-gateway-tls
+  issuerRef:
+    name: goyoai-tools
+    kind: ClusterIssuer
+  dnsNames:
+    - gdmi.goyoai.com

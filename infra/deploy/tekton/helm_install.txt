@@ -1,0 +1,62 @@
+----backend----
+helm package ./deploy/tekton/backend/helm --destination ./deploy/tekton/packages
+
+helm push ./deploy/tekton/packages/tekton-goyoai-web-back-0.1.0.tgz oci://gdharbor.goyoai.com/tekton/ 
+
+helm upgrade --install tekton-goyoai-web-back -n tekton-pipelines oci://gdharbor.goyoai.com/tekton/tekton-goyoai-web-back --version 0.1.0
+
+----backend-portal----
+helm package ./deploy/tekton/backend-portal/helm --destination ./deploy/tekton/packages
+
+helm push ./deploy/tekton/packages/tekton-goyoai-web-back-portal-0.1.0.tgz oci://gdharbor.goyoai.com/tekton/ 
+
+helm upgrade --install tekton-goyoai-web-back-portal -n tekton-pipelines oci://gdharbor.goyoai.com/tekton/tekton-goyoai-web-back-portal --version 0.1.0
+
+----backend-portal-scheduler----
+helm package ./deploy/tekton/backend-scheduller/helm
+
+helm push tekton-goyoai-web-back-portal-scheduler-0.1.0.tgz oci://gdharbor.goyoai.com/goyoai-web-helm/ 
+
+helm upgrade --install tekton-goyoai-web-back-portal-scheduller -n tekton-pipelines oci://gdharbor.goyoai.com/goyoai-web-helm/tekton-goyoai-web-back-portal-scheduler --version 0.1.0
+
+----frontend-vuejs----
+helm package ./deploy/tekton/frontend-vuejs/helm
+
+helm push tekton-goyoai-web-front-0.1.0.tgz oci://gdharbor.goyoai.com/goyoai-web-helm/ 
+
+helm upgrade --install tekton-goyoai-web-front -n tekton-pipelines oci://gdharbor.goyoai.com/goyoai-web-helm/tekton-goyoai-web-front --version 0.1.0
+
+----frontend-react----
+helm package ./deploy/tekton/frontend-react/helm --destination ./deploy/tekton/packages
+
+helm push ./deploy/tekton/packages/tekton-goyoai-web-front-react-0.1.0.tgz oci://gdharbor.goyoai.com/tekton/ 
+
+helm upgrade --install tekton-goyoai-web-front-react -n tekton-pipelines oci://gdharbor.goyoai.com/tekton/tekton-goyoai-web-front-react --version 0.1.0
+
+----frontend-old----
+helm package ./deploy/tekton/frontend-old/helm
+
+helm push tekton-goyoai-web-front-react-0.1.0.tgz oci://gdharbor.goyoai.com/goyoai-web-helm/ 
+
+helm upgrade --install tekton-goyoai-web-front -n tekton-pipelines oci://gdharbor.goyoai.com/goyoai-web-helm/tekton-goyoai-web-front --version 0.1.0
+
+----ai-server----
+helm package ./deploy/tekton/ai-api/helm
+
+helm push tekton-goyoai-ai-server-0.1.0.tgz oci://gdharbor.goyoai.com/goyoai-web-helm/ 
+
+helm upgrade --install tekton-goyoai-ai-server -n tekton-pipelines oci://gdharbor.goyoai.com/goyoai-web-helm/tekton-goyoai-ai-server --version 0.1.0
+
+----crawler----
+helm package ./deploy/tekton/crawler/helm
+
+helm push tekton-goyoai-backend-crawler-0.1.0.tgz oci://gdharbor.goyoai.com/goyoai-web-helm/ 
+
+helm upgrade --install tekton-goyoai-backend-crawler -n tekton-pipelines oci://gdharbor.goyoai.com/goyoai-web-helm/tekton-goyoai-backend-crawler --version 0.1.0
+
+----goyoai-web-page----
+helm package ./deploy/tekton/goyo-homepage/helm
+
+helm push tekton-goyoai-web-page-0.1.0.tgz oci://gdharbor.goyoai.com/goyoai-web-helm/ 
+
+helm upgrade --install tekton-goyoai-web-page -n tekton-pipelines oci://gdharbor.goyoai.com/goyoai-web-helm/tekton-goyoai-web-page --version 0.1.0

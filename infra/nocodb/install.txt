@@ -1,0 +1,3 @@
+helm repo add zekker6 https://zekker6.github.io/helm-charts
+
+helm upgrade --install goyo-nocodb zekker6/nocodb -n nocodb -f nocodb/values.yaml

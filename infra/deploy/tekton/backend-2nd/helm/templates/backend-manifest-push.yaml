@@ -1,0 +1,130 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: {{ .Values.project_name }}-manifest
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: replicas
+      type: string
+      default: "4"
+    - name: cpu_request
+      type: string
+      default: "200m"
+    - name: memory_request
+      type: string
+      default: "1G"
+    - name: cpu_limit
+      type: string
+      default: "1000m"
+    - name: memory_limit
+      type: string
+      default: "3Gi"
+    - name: container-registry-url
+      type: string
+    - name: commit-message
+      type: string
+    - name: kustomize-revision
+      type: string
+      default: "{{ .Values.kustomize_git_branch }}"
+    - name: kustomize-directory
+      type: string
+      default: "{{ .Values.kustomize_directory }}"
+    - name: kustomize-giturl
+      type: string
+      default: {{ .Values.kustomize_git_url }}
+    - name: project-name
+      type: string
+      default: {{ .Values.project_name }}
+    - name: timestamp
+      type: string
+    - name: git-short-sha
+      type: string
+  workspaces:
+    - name: {{ .Values.project_name }}
+  steps:
+    - name: clean-workspace
+      image: {{ .Values.common_alpine_url }}
+      # image: alpine
+      script: |
+        #!/bin/sh
+        WORKSPACE_PATH=$(workspaces.{{ .Values.project_name }}.path)
+        PROJECT_DIR=$WORKSPACE_PATH/$(params.project-name)-manifest
+        # Create project directory if not exists
+        mkdir -p $PROJECT_DIR
+        # Clean the workspace
+        rm -rf $PROJECT_DIR/.[!.]* $PROJECT_DIR/*
+        if [ "$(ls -A $PROJECT_DIR)" ]; then
+          echo "Project directory is not empty after cleaning."
+          ls -al $PROJECT_DIR
+          exit 1
+        else
+          echo "Project directory is now clean."
+        fi
+
+    - name: setup-kustomize-environment
+      image: {{ .Values.common_alpine_git_url }}
+      # image: alpine/git
+      script: |
+        #!/bin/sh
+        set -e
+        WORKSPACE_PATH=$(workspaces.{{ .Values.project_name }}.path)
+        PROJECT_DIR=$WORKSPACE_PATH/$(params.project-name)-manifest
+        GIT_ROOT_PATH=$PROJECT_DIR
+
+        # Configure Git
+        git config --global user.name "goyoai"
+        git config --global user.email "goyo-service_run@goyoai.com"
+
+        # Clone the repository or fetch the latest changes
+        if [ ! -d "$GIT_ROOT_PATH/.git" ]; then
+          git clone --branch $(params.kustomize-revision) $(params.kustomize-giturl) $GIT_ROOT_PATH
+        else
+          git -C $GIT_ROOT_PATH fetch origin
+          git -C $GIT_ROOT_PATH checkout $(params.kustomize-revision) || git -C $GIT_ROOT_PATH checkout -b $(params.kustomize-revision)
+          git -C $GIT_ROOT_PATH reset --hard origin/$(params.kustomize-revision)
+        fi
+
+        # Navigate to the overlay directory to perform file operations
+        OVERLAY_PATH="$GIT_ROOT_PATH/$(params.kustomize-directory)/overlays/dev"
+        mkdir -p $OVERLAY_PATH
+        cd $OVERLAY_PATH
+        rm -rf $OVERLAY_PATH/*
+        echo "Overlay path is ready."
+        # Navigate to the overlay directory to perform file operations
+
+        # Update the Kustomize overlay files        
+        cat <<EOF > deployment_patches.yaml
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: {{ .Values.project_name }}
+        spec:
+          template:
+            spec:
+              containers:
+                - name: {{ .Values.project_name }}-container
+                  image: $(params.container-registry-url):$(params.git-short-sha)-$(params.timestamp)
+        EOF
+
+        # Stage, commit, and push the changes
+        git add  deployment_patches.yaml
+        COMMIT_MESSAGE="$(params.commit-message) with new image tag $(params.git-short-sha)-$(params.timestamp)"
+        git commit -m "$COMMIT_MESSAGE"
+        git push --force-with-lease origin $(params.kustomize-revision)
+
+    - name: manifest-push-end
+      image: {{ .Values.common_alpine_url }}
+      # image: alpine
+      script: |
+        #!/bin/sh
+        # Curl installation
+        apk add --no-cache curl
+
+        SLACK_WEBHOOK_URL="{{ .Values.slack_webhook_url }}"
+        
+        SLACK_MESSAGE="{{ .Values.slack_message }}"
+
+        curl -X POST -H 'Content-type: application/json' \
+        --data '{"text":"'"$SLACK_MESSAGE"'"}' \
+        $SLACK_WEBHOOK_URL

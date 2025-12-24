@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: goyo-loki-gateway-tls
+  namespace: traefik
+spec:
+  secretName: goyo-loki-gateway-tls
+  issuerRef:
+    name: goyoai-tools
+    kind: ClusterIssuer
+  dnsNames:
+    - gdlk.goyoai.com

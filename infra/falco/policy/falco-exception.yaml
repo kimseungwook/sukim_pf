@@ -1,0 +1,24 @@
+apiVersion: kyverno.io/v2
+kind: PolicyException
+metadata:
+  name: falco-exception
+  namespace: falco  # Falco가 설치된 네임스페이스
+spec:
+  background: true
+  # [변경됨] policyNames 대신 exceptions 사용
+  exceptions:
+  - policyName: disallow-host-path
+    ruleNames:
+      - host-path
+  - policyName: disallow-privileged-containers
+    ruleNames:
+      - privileged-containers
+  
+  # Falco Pod에 대해서만 예외 적용
+  match:
+    any:
+    - resources:
+        kinds:
+          - Pod
+        namespaces:
+          - falco

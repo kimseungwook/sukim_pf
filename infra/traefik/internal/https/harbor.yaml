@@ -1,0 +1,84 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: harbor-internal-http
+  namespace: traefik
+spec:
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: Host(`gdhb.go-intern.io`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - name: goyo-harbor-portal
+          namespace: harbor
+          port: 80
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: harbor-internal-https
+  namespace: traefik
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`gdhb.go-intern.io`) && PathPrefix(`/api/`)
+      priority: 20
+      services:
+        - name: goyo-harbor-core
+          namespace: harbor
+          port: 80
+
+    - kind: Rule
+      match: Host(`gdhb.go-intern.io`) && PathPrefix(`/service/`)
+      priority: 20
+      services:
+        - name: goyo-harbor-core
+          namespace: harbor
+          port: 80
+
+    - kind: Rule
+      match: Host(`gdhb.go-intern.io`) && PathPrefix(`/v2/`)
+      priority: 20
+      services:
+        - name: goyo-harbor-core
+          namespace: harbor
+          port: 80
+
+    - kind: Rule
+      match: Host(`gdhb.go-intern.io`) && PathPrefix(`/chartrepo/`)
+      priority: 20
+      services:
+        - name: goyo-harbor-core
+          namespace: harbor
+          port: 80
+
+    - kind: Rule
+      match: Host(`gdhb.go-intern.io`) && PathPrefix(`/c/`)
+      priority: 20
+      services:
+        - name: goyo-harbor-core
+          namespace: harbor
+          port: 80
+
+    - kind: Rule
+      match: Host(`gdhb.go-intern.io`) && PathPrefix(`/projects/`)
+      priority: 20
+      services:
+        - name: goyo-harbor-core
+          namespace: harbor
+          port: 80
+
+    - kind: Rule
+      match: Host(`gdhb.go-intern.io`)
+      priority: 10
+      services:
+        - name: goyo-harbor-portal
+          namespace: harbor
+          port: 80
+  tls: 
+    secretName: goyoai-web-backoffice-tls

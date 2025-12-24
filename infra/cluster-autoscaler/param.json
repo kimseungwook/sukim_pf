@@ -1,0 +1,52 @@
+{
+  "addonName": "ClusterAutoscaler",
+  "configurations": [
+    {
+      "key": "nodes",
+      "value": "2:4:ocid1.nodepool.oc1.ap-seoul-1.aaaaaaaa5lgssff52lroxyg4rcmo2ohvt3dda6zni6liw67ldnpz7d67spvq, 1:2:ocid1.nodepool.oc1.ap-seoul-1.aaaaaaaak3e3nbytk2kjizykdbxfbxxjn656blkp5aqt5qxsvn5xo5fkpeeq, 1:2:ocid1.nodepool.oc1.ap-seoul-1.aaaaaaaa3urgt22vb5lswh57vzddggduhespyfshwd2fdubt4ntwxzk6lyaq"
+    },
+    {
+      "key": "authType",
+      "value": "instance"
+    },
+    {
+      "key": "numOfReplicas",
+      "value": "1"
+    },
+    {
+      "key": "maxNodeProvisionTime",
+      "value": "5m"
+    },
+    {
+      "key": "scaleDownDelayAfterAdd",
+      "value": "2m"
+    },
+    {
+      "key": "scaleDownUnneededTime",
+      "value": "2m"
+    },
+    {
+      "key": "scanInterval",
+      "value": "10s"
+    },
+    {
+      "key": "scaleDownUtilizationThreshold",
+      "value": "0.4"
+    },
+    {
+      "key": "maxNodeTotalCount",
+      "value": "10"
+    },
+    {
+      "key": "annotations",
+      "value": "{\"prometheus.io/scrape\":\"true\",\"prometheus.io/port\":\"8086\"}"
+    },
+    {
+      "key": "tolerations",
+      "value": "[{\"key\":\"hyper-report\", \"value\":\"frontend-web\", \"effect\":\"NoSchedule\", \"operator\":\"Exists\"}]"
+    }
+  ]
+}
+
+
+[{"key":"hyper-report", "value":"frontend-web", "effect":"noSchedule", "operator":"exists"}]

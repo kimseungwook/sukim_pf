@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-sukim-token
+  namespace: tekton-pipelines
+secrets:
+  - name: sukim-git-token
+# imagePullSecrets:
+  - name: harbor-registry-secret
+imagePullSecrets:
+  - name: harbor-registry-secret

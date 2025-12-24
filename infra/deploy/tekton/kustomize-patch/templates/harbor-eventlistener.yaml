@@ -1,0 +1,51 @@
+# harbor-eventlistener.yaml
+
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: {{ .Values.project_name | default .Chart.Name }}-harbor-listener
+  namespace: tekton-pipelines
+spec:
+  serviceAccountName: {{ .Values.el_serviceAccountName }}
+  triggers:
+    - name: harbor-push-trigger
+      interceptors:
+        - ref:
+            name: "cel"
+          params:
+            - name: "filter"
+              value: "body.type == 'PUSH_ARTIFACT' && body.event_data.resources[0].tag != 'latest'"
+            - name: "overlays"
+              value:
+                - key: module_name
+                  # [수정] 네임스페이스가 포함된 전체 리포지토리 이름을 추출합니다.
+                  # (예: gointern/goyoai-gointern-system)
+                  expression: "body.event_data.repository.repo_full_name"
+                - key: image_tag
+                  expression: "body.event_data.resources[0].tag"
+                - key: registry_url
+                  # [수정] resource_url에서 레지스트리 호스트만 추출합니다.
+                  # (예: gdhb.go-intern.io)
+                  expression: "body.event_data.resources[0].resource_url.split('/')[0]"
+      bindings:
+        - ref: {{ .Values.project_name | default .Chart.Name }}-harbor-binding
+      template:
+        ref: {{ .Values.project_name | default .Chart.Name }}-manifest-template
+  resources:
+    kubernetesResource:
+      serviceType: ClusterIP
+      spec:
+        template:
+          spec:
+            
+            {{- if .Values.el_node_selector_key }}
+            nodeSelector:
+              {{ .Values.el_node_selector_key }}: {{ .Values.el_node_selector_value }}
+            {{- end }}
+            {{- if .Values.el_tolerations_key }}
+            tolerations:
+              - key: {{ .Values.el_tolerations_key }}
+                operator: {{ .Values.el_tolerations_operator }}
+                value: {{ .Values.el_tolerations_value }}
+                effect: {{ .Values.el_tolerations_effect }}
+            {{- end }}

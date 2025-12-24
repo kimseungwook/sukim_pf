@@ -1,0 +1,27 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: argocd-https
+  namespace: argocd
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`gdargo.goyoai.com`)
+      # match: PathPrefix(`/`) 
+      priority: 10
+      services:
+        - name: argocd-server
+          port: 80
+    - kind: Rule
+      match: Host(`gdargo.goyoai.com`) && PathPrefix(`/grpc`)
+      # match: PathPrefix(`/`) 
+      priority: 11
+      services:
+        - name: argocd-server
+          port: 80
+          scheme: h2c
+  tls:
+    secretName: argocd-tls
+  # Include TLS configuration if Traefik is handling TLS2

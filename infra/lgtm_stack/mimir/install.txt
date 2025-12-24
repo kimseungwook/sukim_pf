@@ -1,2 +1,2 @@
 helm repo add grafana https://grafana.github.io/helm-charts
-helm upgrade --install goyo-mimir-distributed grafana/mimir-distributed -f lgtm/mimir/values.yaml -n monitoring
+helm upgrade --install mimir grafana/mimir-distributed --version 6.1.0-weekly.373 -f lgtm_stack/mimir/values.yaml -n monitoring

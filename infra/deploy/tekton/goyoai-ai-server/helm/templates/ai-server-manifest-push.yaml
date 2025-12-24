@@ -1,0 +1,180 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: {{ .Values.project_name }}-manifest
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: container-registry-url
+      type: string
+    - name: commit-message
+      type: string
+    - name: kustomize-giturl
+      type: string
+      default: {{ .Values.kustomize_git_url }}
+    - name: project-name
+      type: string
+      default: {{ .Values.project_name }}
+    - name: timestamp
+      type: string
+    - name: git-short-sha
+      type: string
+    - name: module-name
+      type: string
+      description: "The module name to build (e.g., goyoai-gointern-portal)"
+    - name: back-kustomize-branch
+      type: string
+      default: "{{ .Values.back_kustomize_git_branch }}"
+  workspaces:
+    - name: {{ .Values.project_name }}
+  steps:
+    - name: clean-and-setup-workspace
+      image: gdhb.goyoai.com/common/git:2.45.2
+      script: |
+        #!/bin/sh
+        set -e
+        
+        WORKSPACE_PATH=$(workspaces.{{ .Values.project_name }}.path)
+        PROJECT_DIR=$WORKSPACE_PATH/$(params.project-name)-manifest
+        MODULE_NAME="$(params.module-name)"
+        
+        # Workspace 정리
+        rm -rf $PROJECT_DIR
+        mkdir -p $PROJECT_DIR
+        echo "Workspace cleaned and prepared at $PROJECT_DIR"
+
+        # Git 설정 및 클론
+        KUSTOMIZE_BRANCH="$(params.back-kustomize-branch)"
+        git config --global user.name "goyoai-tekton-ci"
+        git config --global user.email "ci@goyoai.com"
+        echo "Cloning manifest repository branch: $KUSTOMIZE_BRANCH"
+        git clone --branch $KUSTOMIZE_BRANCH $(params.kustomize-giturl) $PROJECT_DIR
+        
+        cd $PROJECT_DIR
+
+        # ═══════════════════════════════════════════════════
+        # 동적으로 Kustomize 경로 및 Deployment 이름 설정
+        # ═══════════════════════════════════════════════════
+        # 예: goyoai-gointern-portal → overlays/dev/goyoai-gointern-portal
+        KUSTOMIZE_DIR="goyoai-gitops/k8s-configs/overlays/dev/${MODULE_NAME}"
+        DEPLOYMENT_NAME="${MODULE_NAME}"
+        OVERLAY_PATH="$PROJECT_DIR/$KUSTOMIZE_DIR"
+        
+        echo "Module: ${MODULE_NAME}"
+        echo "Kustomize directory: ${KUSTOMIZE_DIR}"
+        echo "Deployment name: ${DEPLOYMENT_NAME}"
+        
+        # 디렉토리 생성 (없으면)
+        mkdir -p $OVERLAY_PATH
+        
+        echo "Creating deployment patch at $OVERLAY_PATH/deployment_patches.yaml"
+        cat <<EOF > $OVERLAY_PATH/deployment_patches.yaml
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: ${DEPLOYMENT_NAME}
+        spec:
+          template:
+            spec:
+              serviceAccountName: goyoai-vault-sa
+              containers:
+                - name: ${DEPLOYMENT_NAME}-container
+                  image: $(params.container-registry-url)/${MODULE_NAME}:$(params.git-short-sha)-$(params.timestamp)
+        EOF
+        
+        echo ""
+        echo "Generated deployment_patches.yaml:"
+        cat $OVERLAY_PATH/deployment_patches.yaml
+        echo ""
+        
+        # Git 변경사항 커밋 및 푸시
+        git add .
+        # 변경 사항이 있을 때만 커밋 시도
+        if ! git diff --staged --quiet; then
+          COMMIT_MESSAGE="$(params.commit-message) with new image tag $(params.git-short-sha)-$(params.timestamp)"
+          git commit -m "$COMMIT_MESSAGE"
+          git push origin $KUSTOMIZE_BRANCH
+          echo "✅ Manifest updated and pushed successfully."
+        else
+          echo "No changes to commit."
+        fi
+
+    - name: notify-slack
+      image: {{ .Values.common_alpine_url }}
+      script: |
+        #!/bin/sh
+        apk add --no-cache curl
+        
+        SLACK_WEBHOOK_URL="{{ .Values.slack_webhook_url }}"
+        MODULE_NAME="$(params.module-name)"
+        IMAGE_TAG="$(params.git-short-sha)-$(params.timestamp)"
+        COMMIT_SHA="$(params.git-short-sha)"
+        
+        # 현재 시간 (KST)
+        CURRENT_TIME=$(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M:%S')
+        
+        # 🎨 상세한 Slack Block Kit 메시지
+        SLACK_MESSAGE=$(cat <<EOF
+        {
+          "blocks": [
+            {
+              "type": "header",
+              "text": {
+                "type": "plain_text",
+                "text": "✅ CI/CD Pipeline Completed",
+                "emoji": true
+              }
+            },
+            {
+              "type": "section",
+              "fields": [
+                {
+                  "type": "mrkdwn",
+                  "text": "*Module:*\n\`${MODULE_NAME}\`"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Status:*\n:white_check_mark: Success"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Image Tag:*\n\`${IMAGE_TAG}\`"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Commit:*\n\`${COMMIT_SHA}\`"
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*Registry:* \`gdhb.goyoai.com/goyoai-web\`\n*Deployment:* Ready for ArgoCD sync"
+              }
+            },
+            {
+              "type": "context",
+              "elements": [
+                {
+                  "type": "mrkdwn",
+                  "text": "⏰ ${CURRENT_TIME} KST | 📦 Manifest pushed to ArgoCD"
+                }
+              ]
+            },
+            {
+              "type": "divider"
+            }
+          ]
+        }
+        EOF
+        )
+        
+        # Slack 알림 전송 (실패해도 빌드는 성공으로 처리)
+        if curl -X POST -H 'Content-type: application/json' \
+          --data "$SLACK_MESSAGE" \
+          $SLACK_WEBHOOK_URL; then
+          echo "✅ Slack notification sent successfully"
+        else
+          echo "⚠️  Slack notification failed (non-critical)"
+        fi

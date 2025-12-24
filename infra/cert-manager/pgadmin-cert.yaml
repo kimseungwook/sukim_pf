@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: goyo-pgadmin-tls
+  namespace: traefik
+spec:
+  secretName: goyo-pgadmin-tls
+  issuerRef:
+    name: goyoai-tools
+    kind: ClusterIssuer
+  dnsNames:
+    - gdpa.goyoai.com

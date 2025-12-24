@@ -1,0 +1,92 @@
+replica:
+  replicaCount: 2
+  nodeSelector:
+    goyo-svc: deploy
+  tolerations:
+    - key: goyo-svc
+      operator: Equal
+      value: deploy
+      effect: NoSchedule
+  persistence:
+    enabled: true
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+    size: 8Gi
+  service:
+    type: ClusterIP
+    # nodePorts:
+      # redis: "32001"  # 원하는 포트 번호로 설정하세요
+  startupProbe:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 22
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 20
+    periodSeconds: 5
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 5
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 20
+    periodSeconds: 5
+    timeoutSeconds: 1
+    successThreshold: 1
+    failureThreshold: 5
+
+master:
+  nodeSelector:
+    goyo-svc: deploy
+  tolerations:
+    - key: goyo-svc
+      operator: Equal
+      value: deploy
+      effect: NoSchedule
+  persistence:
+    enabled: true
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+    size: 8Gi
+  service:
+    type: ClusterIP
+    # nodePorts:
+      # redis: "32000"  # 원하는 포트 번호로 설정하세요
+  startupProbe:
+    enabled: true
+    initialDelaySeconds: 20
+    periodSeconds: 5
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 5
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 20
+    periodSeconds: 5
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 5
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 20
+    periodSeconds: 5
+    timeoutSeconds: 1
+    successThreshold: 1
+    failureThreshold: 5
+
+headless:
+  service:
+    type: ClusterIP
+    clusterIP: None
+    ports:
+      - port: 6379
+        name: redis
+
+auth:
+  enabled: true
+  password: "Goyoai123!@#"

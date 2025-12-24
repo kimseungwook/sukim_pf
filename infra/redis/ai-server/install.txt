@@ -1,0 +1,5 @@
+helm repo add bitnami https://charts.bitnami.com/bitnami
+
+helm upgrade --install goyoai-ai-server-redis bitnami/redis -f redis/ai-server/values.yaml -n redis
+
+helm upgrade --install aify-ai-server-redis bitnami/redis -f redis/ai-server/values.yaml -n redis

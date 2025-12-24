@@ -1,0 +1,91 @@
+# 최적화된 Chart.yaml (aify 제거, 모듈화 구조)
+apiVersion: v2
+name: tekton-backend-system
+description: |
+  🚀 Goyoai Backend System CI/CD Helm Chart (Optimized)
+  
+  ✨ 주요 기능:
+  - 모듈화된 동적 파이프라인 지원 (System, Portal)
+  - ReadWriteOnce PVC 최적화
+  - 20년차 DevOps 모범 사례 적용
+  - Mono Repo 구조 완벽 지원
+  - 확장 가능한 Values 구조
+  
+  🔧 지원 모듈:
+  - System: 백엔드 시스템 모듈
+  - Portal: 포털 모듈
+  - 추가 모듈 쉬운 확장 가능
+  
+  🏗️ 아키텍처:
+  - Tekton Pipelines v0.17.0+
+  - Kaniko 기반 이미지 빌드
+  - Gradle 캐시 최적화
+  - GitHub 웹훅 통합
+  - Slack 알림 지원
+
+type: application
+version: 3.0.0
+appVersion: "3.0.0"
+
+# 메타데이터
+home: https://github.com/GoyoAi-Service/goyoai-web-manifest
+sources:
+  - https://github.com/kimseungwook/sukim-backend-system
+  - https://github.com/GoyoAi-Service/goyoai-web-manifest
+
+maintainers:
+  - name: DevOps Team
+    email: devops@goyoai.com
+    url: https://goyoai.com
+
+keywords:
+  - tekton
+  - ci-cd
+  - backend
+  - mono-repo
+  - kubernetes
+  - devops
+  - automation
+  - kaniko
+  - gradle
+
+# 호환성 및 요구사항
+annotations:
+  category: "CI/CD"
+  "tekton.dev/pipelines.minVersion": "0.17.0"
+  "kubernetes.io/min-version": "1.20"
+  "helm.sh/resource-policy": "keep"
+  
+  # Helm 차트 정보
+  "artifacthub.io/changes": |
+    - kind: breaking
+      description: "aify 모듈 제거 (별도 관리로 분리)"
+    - kind: added
+      description: "모듈화된 동적 파이프라인 구조"
+    - kind: improved
+      description: "Values 구조 최적화 및 확장성 개선"
+    - kind: improved
+      description: "20년차 DevOps 모범 사례 적용"
+  
+  "artifacthub.io/operator": "false"
+  "artifacthub.io/prerelease": "false"
+  "artifacthub.io/containsSecurityUpdates": "false"
+  
+  # 라이선스 및 문서
+  "artifacthub.io/license": "MIT"
+  "artifacthub.io/links": |
+    - name: GitHub Repository
+      url: https://github.com/GoyoAi-Service/goyoai-web-manifest
+    - name: Documentation
+      url: https://github.com/GoyoAi-Service/goyoai-web-manifest/blob/main/README.md
+  
+  # 지원 정보
+  "artifacthub.io/maintainers": |
+    - name: DevOps Team
+      email: devops@goyoai.com
+
+# 의존성 (현재 없음, 독립적 차트)
+dependencies: []
+
+# 차트 조건 (모든 Kubernetes 버전에서 호환)
+kubeVersion: ">=1.20.0"

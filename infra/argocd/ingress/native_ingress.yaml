@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-ingress
+  namespace: default
+spec:  
+  ingressClassName: native-ingress-noco
+  
+  rules:
+    - host: "argocd.bbrick.com"
+      http:
+        paths:
+          - path: "/"
+            pathType: Prefix
+            backend:
+              service:
+                name: "bitnami-argocd-argo-cd-server"
+                port:
+                  number: 443
+  tls:
+    - hosts:
+        # - "argocdproxy.goyoai.com"
+        - "argocd.bbrick.com"
+      # secretName: argod-tls-secret

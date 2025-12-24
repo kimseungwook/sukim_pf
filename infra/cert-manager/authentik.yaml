@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: goyo-authentik-tls
+  namespace: traefik
+spec:
+  secretName: goyo-authentik-tls
+  issuerRef:
+    name: goyoai-tools
+    kind: ClusterIssuer
+  dnsNames:
+    - gdauth.goyoai.com

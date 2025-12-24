@@ -1,0 +1,485 @@
+mode: daemonset
+
+image:
+  repository: otel/opentelemetry-collector-contrib
+  pullPolicy: IfNotPresent
+  tag: "0.118.0"  # Using a specific version is recommended for stability
+  digest: ""  # Leaving empty to use tag-based versioning
+
+# 리소스 제한 추가
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 200m
+    memory: 400Mi
+
+# Go 메모리 제한 관련 설정
+useGOMEMLIMIT: true
+
+command:
+  name: otelcol-contrib  # This is required for the contrib distribution
+  extraArgs: []
+  
+service:
+  enabled: true
+  type: ClusterIP
+
+clusterRole:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources:
+        - "pods"
+        - "namespaces"
+        - "nodes"
+      verbs:
+        - "get"
+        - "list"
+        - "watch"
+    # metrics에 대한 권한 추가
+    - apiGroups: [""]
+      resources:
+        - "nodes/metrics"
+        - "nodes/stats"
+      verbs:
+        - "get"
+        - "list"
+        - "watch"
+
+serviceAccount:
+  create: true
+  annotations: {}
+
+config:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+    prometheus:
+      config:
+        scrape_configs:
+        - job_name: "goyoai-web-backend"
+          scrape_interval: 30s
+          metrics_path: "/actuator/prometheus"
+          static_configs:
+            - targets: ["goyoai-web-back-app.goyoai-web.svc.cluster.local:9292"]
+          relabel_configs:
+            - source_labels: [__name__]
+              regex: 'jvm_.*|process_.*|system_.*|http_server_requests.*|tomcat_.*|hikaricp_.*|spring_.*|executor_.*'
+              action: keep
+            # - target_label: service_name
+            #   replacement: goyoai-web-back-app
+            # - target_label: namespace
+            #   replacement: goyoai-web
+        - job_name: "dev-goyoai-web-back-v1-metrics"
+          scrape_interval: 10s
+          metrics_path: "/actuator/prometheus"
+          static_configs:
+            - targets: ["dev-back-actuator-v1.dev-goyoai-web.svc.cluster.local:9292"]
+          enable_http2: false  # HTTP/2 관련 이슈 방지
+          follow_redirects: true  # 리다이렉트 허용
+          metric_relabel_configs:  # 메트릭 디버깅용
+            - source_labels: [__name__]
+              regex: ".+"
+              action: keep  
+          # relabel_configs:
+          #   # instance 레이블 추가 (ServiceMonitor와 동일하게)
+          #   - source_labels: [__meta_kubernetes_pod_name]
+          #     action: replace
+          #     target_label: instance
+          #   # 메트릭 필터링 유지
+          #   - source_labels: [__name__]
+          #     regex: 'jvm_.*|process_.*|system_.*|http_server_requests.*|tomcat_.*|hikaricp_.*|spring_.*|executor_.*'
+          #     action: keep
+
+  processors:
+    # filter:
+    #   error_mode: ignore
+    #   logs:
+    #     log_record:
+    #       - 'resource.attributes["service.name"] == "dev-goyoai-web-back-app"'
+          # - 'resource.attributes["service.name"] == "dev-goyoai-web-back-app" and flags == 1'
+          # ERROR, WARN은 무조건 수집
+          # - 'severity_text in ["ERROR", "WARN"]'
+          # INFO 레벨은 HikariCP 관련 로그만 수집
+          # - 'severity_text == "INFO" and IsMatch(body, "HikariCP.*")'
+    # transform:
+    #   error_mode: ignore
+    #   log_statements:
+    #     - context: log
+    #       statements:
+    #         - set(flags, 0) where resource.attributes["service.name"] == "dev-goyoai-web-back-app"
+    # transform2:
+    #   log_statements:
+    #     - context: log
+    #       statements:
+    #         - delete_key(body, "flags") where resource.attributes["service.name"] == "dev-goyoai-web-back-app"
+      # actions:
+      #   - key: flags
+      #     action: delete
+
+    attributes/flags:
+      # include:
+      #   match_type: strict
+      #   resources:
+      #     - key: service.name
+      #       value: dev-goyoai-web-back-app
+      actions:
+        - key: flags
+          action: delete
+
+    attributes/base:
+      actions:
+        - key: traceid
+          from_attribute: "traceid"
+          action: upsert
+        - key: service.name
+          from_attribute: "resource.attributes.service.name"
+          action: upsert
+        - key: severity
+          from_attribute: "severity"
+          action: upsert
+
+    filter/dev:
+      error_mode: ignore
+      logs:
+        log_record:
+          - 'resource.attributes["service.name"] == "dev-goyoai-web-back-app"'
+
+    filter/prod:
+      error_mode: ignore
+      logs:
+        log_record:
+          - 'resource.attributes["service.name"] == "goyoai-web-back-app"'
+
+    batch:
+      send_batch_size: 1000
+      timeout: 5s
+      send_batch_max_size: 0
+
+    memory_limiter:
+      check_interval: 5s
+      limit_percentage: 80
+      spike_limit_percentage: 25
+    
+    attributes:
+      actions:
+        # - key: environment
+        #   value: "development"
+        #   action: upsert
+        # - key: traceid
+        #   from_attribute: "traceid"
+        #   action: upsert
+        # - key: severity
+        #   from_attribute: "severity"
+        #   action: upsert
+        - key: service.name
+          from_attribute: "application.name"
+          action: upsert
+        - key: flags
+          action: delete
+        - key: instrumentation_scope
+          action: delete
+        # - key: flags
+        #   action: delete
+        #   match_type: strict
+        #   from_context: resource
+        #   when: resource.attributes["service.name"] == "dev-goyoai-web-back-app"
+    resource:
+      attributes:
+        - key: service.name
+          from_attribute: "application.name"
+          action: upsert
+        - key: instance
+          from_attribute: K8S_POD_NAME
+          action: upsert
+        # job 정보 추가
+        - key: job
+          value: "dev-goyoai-web-back-v1-metrics"
+          action: upsert
+        # - key: service.namespace
+        #   value: "goyoai-web"
+        #   action: upsert   
+        # - key: k8s.namespace.name
+        #   value: "goyoai-web"
+        #   action: upsert
+        # - key: k8s.pod.name
+        #   from_attribute: K8S_POD_NAME
+        #   action: upsert
+        # - key: host.name
+        #   from_attribute: HOSTNAME
+        #   action: upsert
+        # - key: traceid  # trace ID를 리소스 속성으로 추가
+        #   from_attribute: "traceid"
+        #   action: upsert
+        # 불필요한 속성들 제거
+
+        # - key: application.name
+        #   action: delete
+        - key: service.version
+          action: delete
+        - key: flags
+          action: delete
+        - key: container.id
+          action: delete
+        - key: environment
+          action: delete
+        - key: host.arch
+          action: delete
+        - key: os.description
+          action: delete
+        - key: os.type
+          action: delete
+        - key: process.command_args
+          action: delete
+        - key: service.instance.id
+          action: delete
+        - key: process.executable.path
+          action: delete
+        - key: process.pid
+          action: delete
+        - key: process.runtime.description
+          action: delete
+        - key: process.runtime.name
+          action: delete
+        - key: process.runtime.version
+          action: delete
+        - key: telemetry.distro.name
+          action: delete
+        - key: telemetry.distro.version
+          action: delete
+        - key: telemetry.sdk.language
+          action: delete
+        - key: telemetry.sdk.name
+          action: delete
+        - key: telemetry.sdk.version
+          action: delete
+    attributes/dev:
+      include:
+        match_type: strict
+        resources:
+          - key: service.name
+            value: dev-goyoai-web-back-app
+      actions:
+        - key: flags
+          action: delete
+        - key: traceid
+          from_attribute: "traceid"
+          action: upsert
+        - key: severity
+          from_attribute: "severity"
+          action: upsert
+        - key: service.name
+          from_attribute: "resource.attributes.service.name"
+          action: upsert
+        - key: container.id
+          action: delete
+        - key: environment
+          action: delete
+        - key: host.arch
+          action: delete
+        - key: os.description
+          action: delete
+        - key: os.type
+          action: delete
+        - key: process.command_args
+          action: delete
+        - key: service.instance.id
+          action: delete
+        - key: process.executable.path
+          action: delete
+        - key: process.pid
+          action: delete
+        - key: process.runtime.description
+          action: delete
+        - key: process.runtime.name
+          action: delete
+        - key: process.runtime.version
+          action: delete
+        - key: telemetry.distro.name
+          action: delete
+        - key: telemetry.distro.version
+          action: delete
+        - key: telemetry.sdk.language
+          action: delete
+        - key: telemetry.sdk.name
+          action: delete
+        - key: telemetry.sdk.version
+          action: delete
+
+    # prod 서비스용 attributes 프로세서
+    attributes/prod:
+      include:
+        match_type: strict
+        resources:
+          - key: service.name
+            value: goyoai-web-back-app
+      actions:
+        - key: traceid
+          from_attribute: "traceid"
+          action: upsert
+        - key: severity
+          from_attribute: "severity"
+          action: upsert
+        - key: service.name
+          from_attribute: "resource.attributes.service.name"
+          action: upsert
+        - key: container.id
+          action: delete
+        - key: environment
+          action: delete
+        - key: host.arch
+          action: delete
+        - key: os.description
+          action: delete
+        - key: os.type
+          action: delete
+        - key: process.command_args
+          action: delete
+        - key: service.instance.id
+          action: delete
+        - key: process.executable.path
+          action: delete
+        - key: process.pid
+          action: delete
+        - key: process.runtime.description
+          action: delete
+        - key: process.runtime.name
+          action: delete
+        - key: process.runtime.version
+          action: delete
+        - key: telemetry.distro.name
+          action: delete
+        - key: telemetry.distro.version
+          action: delete
+        - key: telemetry.sdk.language
+          action: delete
+        - key: telemetry.sdk.name
+          action: delete
+        - key: telemetry.sdk.version
+          action: delete
+  exporters:
+    otlp:
+      endpoint: goyo-tempo-distributed-distributor.lgtm.svc.cluster.local:4317
+      tls:
+        insecure: true
+      retry_on_failure:
+        enabled: true
+        initial_interval: 5s
+        max_interval: 30s
+        max_elapsed_time: 120s
+    loki:
+      endpoint: "http://goyo-loki-distributed-gateway.lgtm.svc.cluster.local/loki/api/v1/push"
+      tls:
+        insecure: true
+      headers:
+        x-scope-orgid: "goyo-svc"
+      
+    prometheus:
+      endpoint: "http://goyo-prometheus-stack-kube-prometheus.prometheus.svc.cluster.local:9090/api/v1/write"
+      tls:
+        insecure: true
+      resource_to_telemetry_conversion:
+        enabled: true
+      retry_on_failure:
+        enabled: true
+        initial_interval: 5s
+        max_interval: 30s
+        max_elapsed_time: 120s
+      timeout: 30s
+
+    debug:
+      verbosity: detailed
+      sampling_initial: 1
+      sampling_thereafter: 1
+
+  service:
+    extensions: [health_check]
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, attributes, resource, batch]
+        exporters: [otlp, debug]
+      # logs:
+      #   receivers: [otlp]
+      #   processors:
+      #     - memory_limiter
+      #     - attributes/remove-flags
+      #     - attributes/base
+      #     - batch       # 배치 처리
+      #   exporters: [loki, debug]
+      logs:
+        receivers: [otlp]
+        processors:
+          - memory_limiter
+          # - attributes/remove-flags
+          # - attributes
+          - attributes/flags  # flags 제거를 먼저
+          # - filter/dev       # 그 다음 필터링
+          - resource        # 리소스 속성 정리
+          - batch
+        exporters: [loki, debug]
+      # logs/prod:
+      #   receivers: [otlp]
+      #   processors:
+      #     - memory_limiter
+      #     - resource
+      #     - batch
+      #   exporters: [loki, debug]
+      metrics:
+        receivers: [otlp, prometheus]
+        processors:
+          - memory_limiter
+          - attributes # instance label 추가
+          - resource  # metrics에 대한 특정 속성 처리
+          - batch
+        exporters: [prometheus, debug]
+
+    telemetry:
+      logs:
+        level: debug  # 추가 필요
+        development: true  # 추가 필요
+      metrics:
+        address: 0.0.0.0:8888
+        level: detailed
+
+tolerations:
+  - key: "goyo-svc"
+    operator: "Equal"
+    value: "web-apps"
+    effect: "NoSchedule"
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: "goyo-svc"
+          operator: In
+          values:
+          - "web-apps"
+ports:
+  otlp:
+    enabled: true
+    containerPort: 4317  # gRPC
+    servicePort: 4317
+    protocol: TCP
+  otlp-http:
+    enabled: true
+    containerPort: 4318  # HTTP
+    servicePort: 4318
+    protocol: TCP
+  metrics:
+    enabled: true
+
+serviceMonitor:
+  enabled: true
+
+podAnnotations:  # 메트릭 수집을 위한 어노테이션
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8888"

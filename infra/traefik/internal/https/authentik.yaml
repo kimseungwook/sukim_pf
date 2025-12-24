@@ -1,0 +1,36 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: authentik-internal-http
+  namespace: traefik
+spec:
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: Host(`gdauth.go-intern.io`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - name: authentik-server
+          namespace: authentik
+          port: 80
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: authentik-internal-https
+  namespace: traefik
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`gdauth.go-intern.io`)
+      priority: 11
+      services:
+        - name: authentik-server
+          namespace: authentik
+          port: 80
+  tls:
+    secretName: goyoai-web-backoffice-tls

@@ -1,0 +1,26 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: tempo-gateway-https
+  namespace: traefik
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`gdtp.goyoai.com`) && PathPrefix(`/v1/traces`)
+      priority: 10
+      services:
+        - name: goyo-tempo-distributed-distributor
+          namespace: lgtm
+          port: 4318
+    - kind: Rule
+      match: Host(`gdtp.goyoai.com`) && PathPrefix(`/grpc/v1/traces`)
+      priority: 11
+      services:
+        - name: goyo-tempo-distributed-distributor
+          namespace: lgtm
+          port: 4317
+          scheme: h2c
+  tls: 
+    secretName: goyo-tempo-gateway-tls

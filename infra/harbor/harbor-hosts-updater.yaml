@@ -1,0 +1,65 @@
+# goyo_dev/harbor/harbor-hosts-updater.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: harbor-hosts-updater
+  namespace: kube-system
+  labels:
+    app: harbor-hosts-updater
+spec:
+  selector:
+    matchLabels:
+      app: harbor-hosts-updater
+  template:
+    metadata:
+      labels:
+        app: harbor-hosts-updater
+    spec:
+      hostNetwork: true
+      hostPID: true
+      tolerations:
+      - operator: Exists
+      initContainers:
+      - name: update-hosts
+        image: alpine:3.18
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          
+          echo "Updating /etc/hosts on node: $(hostname)"
+          
+          # 호스트의 /etc/hosts 직접 수정
+          HOSTS_FILE="/host/etc/hosts"
+          HARBOR_DOMAIN="gdhb.go-intern.io"
+          HARBOR_IP="10.96.17.121"
+          
+          # 이미 있는지 확인
+          if grep -q "$HARBOR_DOMAIN" "$HOSTS_FILE"; then
+            echo "Entry already exists, updating..."
+            sed -i "/$HARBOR_DOMAIN/d" "$HOSTS_FILE"
+          fi
+          
+          # 추가
+          echo "$HARBOR_IP $HARBOR_DOMAIN" >> "$HOSTS_FILE"
+          
+          echo "✓ /etc/hosts updated successfully"
+          cat "$HOSTS_FILE" | grep "$HARBOR_DOMAIN"
+        volumeMounts:
+        - name: host-etc
+          mountPath: /host/etc
+        securityContext:
+          privileged: true
+      containers:
+      - name: pause
+        image: registry.k8s.io/pause:3.9
+        resources:
+          limits:
+            cpu: 10m
+            memory: 20Mi
+      volumes:
+      - name: host-etc
+        hostPath:
+          path: /etc
+          type: Directory

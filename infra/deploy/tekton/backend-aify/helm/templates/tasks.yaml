@@ -1,0 +1,330 @@
+# 모듈화된 동적 태스크 템플릿 (aify 제거, 최적화)
+# templates/tasks.yaml
+# ===================================================================
+
+# ===================================================================
+# 🔧 공통 태스크들 (모든 모듈에서 사용)
+# ===================================================================
+
+# Git Clone 태스크
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: {{ .Values.global.project_name }}-git-clone
+  namespace: tekton-pipelines
+  labels:
+    {{- include "aify-backend.labels" . | nindent 4 }}
+    type: git-clone
+  annotations:
+    description: "Git 저장소 클론 및 워크스페이스 정리"
+spec:
+  workspaces:
+    - name: {{ .Values.global.project_name }}
+      description: "공유 워크스페이스"
+  params:
+    - name: revision
+      type: string
+      description: "Git revision (branch/tag/commit)"
+    - name: giturl
+      type: string
+      description: "Git repository URL"
+    - name: project-name
+      type: string
+      description: "프로젝트 이름"
+    - name: module-name
+      type: string
+      description: "모듈 이름"
+  results:
+    - name: commit
+      description: "Git commit hash"
+  steps:
+    - name: clean-workspace
+      image: {{ .Values.global.images.alpine }}
+      script: |
+        #!/bin/sh
+        echo "🧹 워크스페이스 정리 중..."
+        cd $(workspaces.{{ .Values.global.project_name }}.path)
+        rm -rf .git || true
+        rm -rf * || true
+        rm -rf .* 2>/dev/null || true
+        echo "✅ 워크스페이스 정리 완료"
+      
+    - name: clone
+      image: {{ .Values.global.images.alpine_git }}
+      script: |
+        #!/bin/sh
+        set -e
+        echo "📂 Git 저장소 클론 시작..."
+        echo "  Repository: $(params.giturl)"
+        echo "  Revision: $(params.revision)"
+        echo "  Module: $(params.module-name)"
+        
+        cd $(workspaces.{{ .Values.global.project_name }}.path)
+        git clone $(params.giturl) .
+        git checkout $(params.revision)
+        
+        COMMIT_SHA=$(git rev-parse HEAD)
+        echo "✅ 클론 완료: $COMMIT_SHA"
+        echo -n "$COMMIT_SHA" | tee $(results.commit.path)
+
+{{- range $moduleName, $moduleConfig := .Values.modules }}
+{{- if $moduleConfig.enabled }}
+# ===================================================================
+# 🔹 {{ upper $moduleName }} 모듈 이미지 빌드 태스크
+# ===================================================================
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: {{ $moduleConfig.taskName }}
+  namespace: tekton-pipelines
+  labels:
+    {{- include "aify-backend.labels" $ | nindent 4 }}
+    module: {{ $moduleName }}
+    type: image-build
+  annotations:
+    description: "{{ title $moduleName }} 모듈 컨테이너 이미지 빌드 (Gradle + Kaniko)"
+spec:
+  workspaces:
+    - name: {{ $.Values.global.project_name }}
+      description: "소스 코드 워크스페이스"
+    - name: {{ $moduleName }}-gradle-cache
+      description: "Gradle 캐시 ({{ title $moduleName }})"
+      mountPath: /cache
+  params:
+    - name: container-registry-url
+      type: string
+      description: "컨테이너 레지스트리 URL"
+    - name: container-registry-cache-url
+      type: string
+      description: "컨테이너 레지스트리 캐시 URL"
+    - name: project-name
+      type: string
+      description: "프로젝트 이름"
+    - name: timestamp
+      type: string
+      description: "빌드 타임스탬프"
+    - name: git-short-sha
+      type: string
+      description: "Git 짧은 SHA"
+    - name: module-name
+      type: string
+      description: "모듈 이름"
+    - name: dockerfile-name
+      type: string
+      description: "Dockerfile 이름"
+  steps:
+    - name: build-and-push
+      image: {{ $.Values.global.images.kaniko }}
+      args:
+        {{- range $.Values.build.kaniko.args }}
+        - {{ . }}
+        {{- end }}
+        - --context=dir://$(workspaces.{{ $.Values.global.project_name }}.path)
+        - --dockerfile=$(workspaces.{{ $.Values.global.project_name }}.path)/$(params.dockerfile-name)
+        - --destination=$(params.container-registry-url)/$(params.module-name):$(params.timestamp)-$(params.git-short-sha)
+        - --cache-repo=$(params.container-registry-cache-url)/$(params.module-name)
+      env:
+        - name: GRADLE_USER_HOME
+          value: {{ $.Values.build.gradle.userHome }}
+        - name: GRADLE_OPTS
+          value: {{ $.Values.build.gradle.opts }}
+      volumeMounts:
+        - name: docker-config
+          mountPath: /kaniko/.docker
+          readOnly: true
+  volumes:
+    - name: docker-config
+      secret:
+        secretName: {{ $.Values.global.registry.secret }}
+        items:
+          - key: .dockerconfigjson
+            path: config.json
+  sidecars:
+    - name: gradle-cache-warmer
+      image: {{ $.Values.global.images.alpine }}
+      script: |
+        #!/bin/sh
+        echo "🔥 {{ title $moduleName }} Gradle 캐시 워밍업..."
+        mkdir -p /cache/gradle-home
+        chmod 755 /cache/gradle-home
+        echo "✅ 캐시 디렉토리 준비 완료"
+      volumeMounts:
+        - name: {{ $moduleName }}-gradle-cache
+          mountPath: /cache
+
+{{- end }}
+{{- end }}
+
+# Manifest 업데이트 태스크
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: {{ .Values.global.project_name }}-manifest
+  namespace: tekton-pipelines
+  labels:
+    {{- include "aify-backend.labels" . | nindent 4 }}
+    type: manifest-update
+  annotations:
+    description: "Kubernetes Manifest 업데이트 및 Git 푸시"
+spec:
+  workspaces:
+    - name: {{ .Values.global.project_name }}
+      description: "작업 워크스페이스"
+  params:
+    - name: manifest-file-name
+      type: string
+      description: "업데이트할 매니페스트 파일명"
+    - name: container-registry-url
+      type: string
+      description: "컨테이너 레지스트리 URL"
+    - name: commit-message
+      type: string
+      description: "Git 커밋 메시지"
+    - name: revision
+      type: string
+      description: "소스 브랜치"
+    - name: project-name
+      type: string
+      description: "프로젝트 이름"
+    - name: timestamp
+      type: string
+      description: "빌드 타임스탬프"
+    - name: git-short-sha
+      type: string
+      description: "Git 짧은 SHA"
+    - name: module-name
+      type: string
+      description: "모듈 이름"
+  steps:
+    - name: update-manifest
+      image: {{ .Values.global.images.alpine_git }}
+      script: |
+        #!/bin/sh
+        set -e
+        
+        echo "📝 Kubernetes Manifest 업데이트 시작..."
+        echo "  파일: $(params.manifest-file-name)"
+        echo "  모듈: $(params.module-name)"
+        echo "  이미지 태그: $(params.timestamp)-$(params.git-short-sha)"
+        
+        cd $(workspaces.{{ .Values.global.project_name }}.path)
+        
+        # Manifest 저장소 클론
+        rm -rf manifest-repo
+        git clone {{ .Values.global.kustomize.gitUrl }} manifest-repo
+        cd manifest-repo
+        
+        # 모듈별 Kustomize 디렉토리 동적 결정
+        {{- range $moduleName, $moduleConfig := .Values.modules }}
+        {{- if $moduleConfig.enabled }}
+        if [ "$(params.module-name)" = "{{ $moduleConfig.build.moduleName }}" ]; then
+          KUSTOMIZE_DIR="{{ $moduleConfig.kustomize.directory }}"
+          DEPLOYMENT_NAME="{{ $moduleConfig.kustomize.deploymentName }}"
+          KUSTOMIZE_BRANCH="{{ $moduleConfig.kustomize.branch }}"
+        fi
+        {{- end }}
+        {{- end }}
+        
+        git checkout $KUSTOMIZE_BRANCH
+        cd $KUSTOMIZE_DIR
+        
+        # 이미지 태그 업데이트
+        NEW_IMAGE="$(params.container-registry-url)/$(params.module-name):$(params.timestamp)-$(params.git-short-sha)"
+        echo "🔄 이미지 업데이트: $NEW_IMAGE"
+        
+        # kustomization.yaml에서 이미지 업데이트
+        if [ -f kustomization.yaml ]; then
+          # 기존 이미지 라인 찾아서 교체
+          sed -i "s|newTag:.*|newTag: $(params.timestamp)-$(params.git-short-sha)|g" kustomization.yaml
+          echo "✅ kustomization.yaml 업데이트 완료"
+        else
+          echo "❌ kustomization.yaml 파일을 찾을 수 없습니다"
+          exit 1
+        fi
+        
+        # 변경사항 커밋 및 푸시
+        git config user.name "Tekton Pipeline"
+        git config user.email "tekton@goyoai.com"
+        git add .
+        
+        if git diff --staged --quiet; then
+          echo "ℹ️ 변경사항이 없습니다"
+        else
+          git commit -m "$(params.commit-message) [$(params.module-name):$(params.timestamp)-$(params.git-short-sha)]"
+          git push origin $KUSTOMIZE_BRANCH
+          echo "✅ Manifest 업데이트 및 푸시 완료"
+        fi
+
+# Slack 알림 태스크
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: slack-notification
+  namespace: tekton-pipelines
+  labels:
+    {{- include "aify-backend.labels" . | nindent 4 }}
+    type: notification
+  annotations:
+    description: "Slack 채널로 빌드 결과 알림 전송"
+spec:
+  params:
+    - name: webhook-url
+      type: string
+      description: "Slack 웹훅 URL"
+    - name: message
+      type: string
+      description: "전송할 메시지"
+    - name: status
+      type: string
+      description: "빌드 상태"
+      default: "Unknown"
+  steps:
+    - name: send-notification
+      image: curlimages/curl:latest
+      script: |
+        #!/bin/sh
+        set -e
+        
+        # 상태에 따른 이모지 설정 (apk 설치 없이)
+        case "$(params.status)" in
+          "Succeeded") EMOJI="✅" COLOR="good" ;;
+          "Failed") EMOJI="❌" COLOR="danger" ;;
+          *) EMOJI="⚠️" COLOR="warning" ;;
+        esac
+        
+        echo "📢 Slack 알림 전송 중..."
+        
+        # Slack 메시지 전송 (jq 없이 간단한 JSON)
+        if [ -n "$(params.webhook-url)" ]; then
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\"$EMOJI $(params.message)\"}" \
+            "$(params.webhook-url)"
+          echo "✅ Slack 알림 전송 완료"
+        else
+          echo "⚠️ Slack 웹훅 URL이 설정되지 않았습니다"
+        fi
+
+# ===================================================================
+# 📊 생성된 태스크 요약 정보
+# ===================================================================
+# 
+# 🔧 공통 태스크:
+# 1. generate-timestamp - 타임스탬프 생성
+# 2. {{ .Values.global.project_name }}-git-clone - Git 클론
+# 3. {{ .Values.global.project_name }}-manifest - Manifest 업데이트
+# 4. slack-notification - Slack 알림
+# 
+# 🔹 모듈별 빌드 태스크:
+{{- range $moduleName, $moduleConfig := .Values.modules }}
+{{- if $moduleConfig.enabled }}
+# - {{ $moduleConfig.taskName }} ({{ title $moduleName }} 모듈)
+{{- end }}
+{{- end }}
+# 
+# 각 태스크는 노드 스케줄링, 보안 컨텍스트, 리소스 제한 적용
+# PVC를 통한 워크스페이스 및 캐시 공유
+# ===================================================================

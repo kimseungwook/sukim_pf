@@ -1,0 +1,27 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: otlp-https
+  namespace: otlp
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`gdotlp.goyoai.com`)
+      # match: PathPrefix(`/`) 
+      priority: 10
+      services:
+        - name: goyo-opentelemetry-collector
+          port: 4318
+    - kind: Rule
+      match: Host(`gdotlp.goyoai.com`) && PathPrefix(`/grpc`)
+      # match: PathPrefix(`/`) 
+      priority: 11
+      services:
+        - name: goyo-opentelemetry-collector
+          port: 4318
+          scheme: h2c
+  tls:
+    secretName: otlp-tls
+  # Include TLS configuration if Traefik is handling TLS2

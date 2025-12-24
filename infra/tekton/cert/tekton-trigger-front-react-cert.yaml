@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: tekton-trigger-front-react-tls
+  namespace: tekton-pipelines
+spec:
+  secretName: tekton-trigger-front-react-tls
+  issuerRef:
+    name: tekton-dev
+    kind: ClusterIssuer
+  dnsNames:
+    - gdwfrontreactdev.goyoai.com

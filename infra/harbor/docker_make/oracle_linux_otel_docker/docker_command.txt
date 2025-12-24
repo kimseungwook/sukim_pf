@@ -1,0 +1,3 @@
+docker build -t gdhb.goyoai.com/common/openjdk:17-jdk-oraclelinux8-otel-2.21.0 -f ./harbor/oracle_linux_otel_docker/Dockerfile .
+
+docker push gdhb.goyoai.com/common/openjdk:17-jdk-oraclelinux8-otel-2.21.0   

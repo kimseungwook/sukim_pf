@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: stock-webs-tls
+  namespace: traefik
+spec:
+  secretName: stock-webs-tls
+  issuerRef:
+    name: stock-tools
+    kind: ClusterIssuer
+  dnsNames:
+    - stock.bbrick.com

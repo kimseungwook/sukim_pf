@@ -1,0 +1,116 @@
+# =============================================================================
+# Valkey Values for Authentik
+# =============================================================================
+# Standalone 모드, 인증 없음, 경량 설정
+# 설치: helm upgrade --install authentik-valkey oci://registry-1.docker.io/bitnamicharts/valkey \
+#         -f valkey_values.yaml -n authentik
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Architecture
+# -----------------------------------------------------------------------------
+# standalone: Primary 1개만 (replica 없음)
+architecture: standalone
+
+# -----------------------------------------------------------------------------
+# Security (Bitnami 이미지 오버라이드 허용)
+# -----------------------------------------------------------------------------
+global:
+  security:
+    allowInsecureImages: true
+
+# -----------------------------------------------------------------------------
+# Authentication (비활성화 - Authentik 내부 통신용)
+# -----------------------------------------------------------------------------
+auth:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# Common Configuration
+# -----------------------------------------------------------------------------
+commonConfiguration: |-
+  # Enable AOF persistence
+  appendonly yes
+  # Disable RDB persistence
+  save ""
+  # Memory policy
+  maxmemory-policy allkeys-lru
+
+# -----------------------------------------------------------------------------
+# Primary Configuration
+# -----------------------------------------------------------------------------
+primary:
+  # 리소스 설정
+  resourcesPreset: "none"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+
+  # Node Affinity
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: service
+                operator: In
+                values:
+                  - "tools"
+              - key: cpu-type
+                operator: In
+                values:
+                  - "arm64"
+
+  # Persistence
+  persistence:
+    enabled: true
+    size: 2Gi
+    # storageClass: ""
+
+  # Service
+  service:
+    type: ClusterIP
+    ports:
+      valkey: 6379
+
+# -----------------------------------------------------------------------------
+# Replica Configuration (standalone 모드에서는 사용 안함)
+# -----------------------------------------------------------------------------
+replica:
+  replicaCount: 0
+
+# -----------------------------------------------------------------------------
+# Metrics & Monitoring
+# -----------------------------------------------------------------------------
+metrics:
+  enabled: true
+  
+  resourcesPreset: "none"
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 64Mi
+
+  serviceMonitor:
+    enabled: true
+    namespace: ""
+    interval: 30s
+    scrapeTimeout: 10s
+    additionalLabels:
+      release: prometheus-stack
+
+# -----------------------------------------------------------------------------
+# Network Policy
+# -----------------------------------------------------------------------------
+networkPolicy:
+  enabled: false
+
+# -----------------------------------------------------------------------------
+# Pod Disruption Budget
+# -----------------------------------------------------------------------------
+pdb: {}

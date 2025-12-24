@@ -1,0 +1,7 @@
+apiVersion: v2
+name: kustomize-patch
+description: Tekton pipeline to update Kustomize manifests from Harbor webhook
+type: application
+version: 1.0.0
+appVersion: "1.0"
+icon: https://raw.githubusercontent.com/tektoncd/dashboard/main/src/images/tekton-logo.png

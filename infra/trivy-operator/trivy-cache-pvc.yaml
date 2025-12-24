@@ -1,0 +1,16 @@
+# goyo_dev/trivy-operator/trivy-cache-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: trivy-cache
+  namespace: trivy
+  labels:
+    app.kubernetes.io/name: trivy-operator
+    app.kubernetes.io/component: cache
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: oci-bv  # OCI Block Volume
+  resources:
+    requests:
+      storage: 2Gi  # Trivy DB ~500MB + Java DB ~300MB = 여유있게 2GB

@@ -1,0 +1,64 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: goyoai-web-backend-relay
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: gitrevision
+      description: The git revision
+      default: develop_web  # Default to 'dev' branch
+    - name: gitrepositoryurl
+      description: The git repository URL
+      default: "https://github.com/GoyoAi-Service/goyoai-web-back"
+    - name: git-sha
+    - name: git-short-sha
+    - name: deploy-env
+    - name: git-repo-name
+
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: goyoai-web-back-
+        namespace: tekton-pipelines
+      spec:
+        pipelineRef:
+          name: goyoai-web-backend-relay
+        params:
+          - name: giturl
+            value: "$(tt.params.gitrepositoryurl)"
+          - name: ocir-url
+            value: "icn.ocir.io/cn7ipyag4bte/goyoai-web-back-dev"
+          - name: ocir-cache-url
+            value: "icn.ocir.io/cn7ipyag4bte/goyoai-web-back-cache-dev"
+          - name: manifest-file-name
+            value: "frontend-manifest.yaml"
+          - name: commit-message
+            value: "Update $(tt.params.git-repo-name):$(tt.params.gitrevision) git hash: $(tt.params.git-short-sha) "
+          - name: project-name
+            value: "$(tt.params.git-repo-name)"
+          - name: revision
+            value: "$(tt.params.gitrevision)"
+          - name: git-short-sha
+            value: "$(tt.params.git-short-sha)"
+        workspaces:
+          - name: goyoai-web-backend-relay
+            persistentVolumeClaim:
+              claimName: goyoai-web-backend-relay
+          - name: dockerconfig
+            secret:
+              secretName: ocirsecret
+        serviceAccountName: tekton-ci-token    
+        podTemplate:         
+          nodeSelector:
+            service: "tools"
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: "service"
+                    operator: In
+                    values: 
+                    - "tools"

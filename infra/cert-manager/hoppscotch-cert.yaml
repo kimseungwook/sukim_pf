@@ -1,0 +1,14 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: goyo-hoppscotch-tls
+  namespace: traefik
+spec:
+  secretName: goyo-hoppscotch-tls
+  issuerRef:
+    name: goyoai-tools
+    kind: ClusterIssuer
+  dnsNames:
+    - gdhs.goyoai.com
+    - gdahs.goyoai.com
+    - gdbhs.goyoai.com

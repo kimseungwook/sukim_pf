@@ -1,0 +1,3 @@
+helm repo add descheduler https://kubernetes-sigs.github.io/descheduler/
+
+helm upgrade --install goyo-descheduler descheduler/descheduler -f descheduler/values.yaml -n descheduler

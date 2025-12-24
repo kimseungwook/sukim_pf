@@ -1,0 +1,2 @@
+helm repo add falcosecurity https://falcosecurity.github.io/charts
+helm upgrade -i goyo-falco falcosecurity/falco --version 6.0.0 -f falco/values.yaml -n falco --create-namespace

@@ -1,0 +1,26 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: matomo-https
+  namespace: traefik
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`gdmat.goyoai.com`)
+      priority: 10
+      services:
+        - name: goyo-mamoto-matomo
+          namespace: matomo
+          port: 80
+    - kind: Rule
+      match: Host(`gdmat.goyoai.com`) && PathPrefix(`/grpc`)
+      priority: 11
+      services:
+        - name: goyo-mamoto-matomo
+          namespace: matomo
+          port: 80
+          scheme: h2c
+  tls:
+    secretName: goyoai-webs-tls

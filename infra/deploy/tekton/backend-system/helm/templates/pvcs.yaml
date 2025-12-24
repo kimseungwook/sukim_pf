@@ -1,0 +1,72 @@
+# 모듈별로 시인성 좋게 정리된 PVC 템플릿 (aify 제거, 동적 생성)
+# templates/pvcs.yaml
+# ===================================================================
+
+{{- range $moduleName, $moduleConfig := .Values.modules }}
+{{- if $moduleConfig.enabled }}
+# ===================================================================
+# 🔹 {{ upper $moduleName }} 모듈 PVC
+# ===================================================================
+
+# {{ title $moduleName }} Workspace PVC
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $moduleConfig.pvc.workspace }}
+  namespace: tekton-pipelines
+  labels:
+    {{- include "backend-system.labels" $ | nindent 4 }}
+    module: {{ $moduleName }}
+    type: workspace
+  annotations:
+    description: "{{ title $moduleName }} 모듈 워크스페이스 PVC (ReadWriteOnce)"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ $.Values.global.storage.className }}
+  resources:
+    requests:
+      storage: 5Gi
+
+# {{ title $moduleName }} Cache PVC
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $moduleConfig.pvc.cache }}
+  namespace: tekton-pipelines
+  labels:
+    {{- include "backend-system.labels" $ | nindent 4 }}
+    module: {{ $moduleName }}
+    type: cache
+  annotations:
+    description: "{{ title $moduleName }} 모듈 Gradle 캐시 PVC"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ $.Values.global.storage.className }}
+  resources:
+    requests:
+      storage: {{ $.Values.global.storage.size }}
+
+{{- end }}
+{{- end }}
+
+# ===================================================================
+# 📊 동적 생성된 PVC 요약 정보
+# ===================================================================
+# 
+# 활성화된 모듈별로 생성되는 PVC들:
+{{- range $moduleName, $moduleConfig := .Values.modules }}
+{{- if $moduleConfig.enabled }}
+# 
+# 🔹 {{ upper $moduleName }} 모듈:
+#   - {{ $moduleConfig.pvc.workspace }} (Workspace, 5Gi)
+#   - {{ $moduleConfig.pvc.cache }} (Cache, {{ $.Values.global.storage.size }})
+{{- end }}
+{{- end }}
+# 
+# 각 PVC는 ReadWriteOnce로 독립적 운영
+# StorageClass: {{ .Values.global.storage.className }}
+# ===================================================================

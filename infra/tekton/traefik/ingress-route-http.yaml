@@ -1,0 +1,107 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: tekton-dashboard-http
+  namespace: tekton-pipelines
+spec:
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: Host(`gdtek.goyoai.com`) && PathPrefix(`/`) 
+      # match: PathPrefix(`/`) 
+      priority: 10
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: tekton-dashboard
+          port: 9097
+
+    - kind: Rule
+      match: Host(`gdwfrontdev.goyoai.com`) && PathPrefix(`/`) 
+      # match: PathPrefix(`/`) 
+      priority: 13
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: el-goyoai-web-front
+          port: 8080
+
+    - kind: Rule
+      match: Host(`gdwbackdev.goyoai.com`) && PathPrefix(`/`) 
+      # match: PathPrefix(`/`) 
+      priority: 14
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: el-goyoai-web-back
+          port: 8080
+
+    - kind: Rule
+      match: Host(`gdwaiserverdev.goyoai.com`) && PathPrefix(`/`) 
+      # match: PathPrefix(`/`) 
+      priority: 15
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: el-goyoai-ai-server
+          port: 8080  
+
+    - kind: Rule
+      match: Host(`gdwbackportaldev.goyoai.com`) && PathPrefix(`/`) 
+      # match: PathPrefix(`/`) 
+      priority: 16
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: el-goyoai-ai-server
+          port: 8080  
+
+    - kind: Rule
+      match: Host(`gdwback2nddev.goyoai.com`) && PathPrefix(`/`) 
+      # match: PathPrefix(`/`) 
+      priority: 17
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: el-goyoai-web-back-2nd
+          port: 8080  
+
+    - kind: Rule
+      match: Host(`gdwfrontreactdev.goyoai.com`) && PathPrefix(`/`) 
+      # match: PathPrefix(`/`) 
+      priority: 18
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: el-goyoai-web-front-react
+          port: 8080
+
+    # - kind: Rule
+    #   match: Host(`gdwhomepage.goyoai.com`) && PathPrefix(`/`) 
+    #   # match: PathPrefix(`/`) 
+    #   priority: 19
+    #   middlewares:
+    #     - name: redirect-http-https
+    #   services:
+    #     - kind: Service
+    #       name: el-goyoai-web-page
+    #       port: 8080
+
+    - kind: Rule
+      match: Host(`gdwbackportalschedulerdev.goyoai.com`) && PathPrefix(`/`) 
+      # match: PathPrefix(`/`) 
+      priority: 19
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: el-goyoai-web-back-portal-scheduler
+          port: 8080

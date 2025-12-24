@@ -1,0 +1,15 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: goyoai-backend-system-tls
+  namespace: goyoai-web
+spec:
+  secretName: goyoai-backend-system-tls
+  issuerRef:
+    name: goyoai-tools
+    kind: ClusterIssuer
+  dnsNames:
+    - devapi2.goyoai.com
+    - devapi2-portal.goyoai.com
+    - devapi-aify.goyoai.com
+    - devapi-aify-portal.goyoai.com

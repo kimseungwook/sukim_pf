@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: image-pull-test
+  name: image-pull-test
+  namespace: tekton-pipelines
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: image-pull-test
+  template:
+    metadata:
+      labels:
+        app: image-pull-test
+    spec:
+      containers:
+      - name: image-pull-test
+        image: gdharbor.goyoai.com/common/alpine:3.20.0
+      imagePullSecrets:
+      - name: harborcred
+      # - name: global-harbor-ca
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: "service"
+                operator: In
+                values:
+                - "tools"

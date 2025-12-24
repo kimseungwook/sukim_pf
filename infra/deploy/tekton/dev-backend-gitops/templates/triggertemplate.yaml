@@ -1,0 +1,60 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: {{ .Values.project_name }}-gitops-template
+  namespace: {{ .Values.namespace }}
+spec:
+  params:
+    - name: app-name
+      description: Application name
+      default: {{ .Values.project_name }}
+    - name: image-tag
+      description: Image tag to deploy
+    - name: registry
+      description: Container registry URL
+      default: {{ .Values.container_registry_url }}
+    - name: namespace-env
+      description: Target namespace (dev/qa/prod)
+      default: "dev"
+  
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: {{ .Values.project_name }}-gitops-
+        namespace: {{ .Values.namespace }}
+        labels:
+          app: {{ .Values.project_name }}
+          trigger: gitops-update
+      spec:
+        pipelineRef:
+          name: {{ .Values.project_name }}-gitops-pipeline
+        params:
+          - name: app-name
+            value: "$(tt.params.app-name)"
+          - name: image-tag
+            value: "$(tt.params.image-tag)"
+          - name: registry
+            value: "$(tt.params.registry)"
+          - name: namespace-env
+            value: "$(tt.params.namespace-env)"
+          - name: kustomize-git-url
+            value: {{ .Values.kustomize_git_url }}
+          - name: kustomize-git-branch
+            value: {{ .Values.kustomize_git_branch }}
+          - name: kustomize-directory
+            value: {{ .Values.kustomize_directory }}
+        workspaces:
+          - name: gitops-source
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                - ReadWriteOnce
+                storageClassName: {{ .Values.pvc.storageClassName }}
+                resources:
+                  requests:
+                    storage: {{ .Values.pvc.size }}
+        serviceAccountName: {{ .Values.serviceAccountName }}
+        podTemplate:
+          nodeSelector:
+            service: "tools"

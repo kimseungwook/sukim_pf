@@ -1,0 +1,26 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: stock-https
+  namespace: traefik
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`stock.bbrick.com`)
+      priority: 10
+      services:
+        - name: goyoai-stock-web
+          namespace: goyoai-web
+          port: 5001
+    - kind: Rule
+      match: Host(`stock.bbrick.com`) && PathPrefix(`/grpc`)
+      priority: 11
+      services:
+        - name: goyoai-stock-web
+          namespace: goyoai-web
+          port: 5001
+          scheme: h2c
+  tls:
+    secretName: stock-webs-tls

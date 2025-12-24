@@ -1,0 +1,328 @@
+# ===================================================================
+# 🏗️ GOYOAI BACKEND SYSTEM CI/CD VALUES
+# 모듈별로 구조화된 설정 파일 (ReadWriteOnce PVC 대응)
+# ===================================================================
+
+# 🔧 공통 프로젝트 설정
+# ===================================================================
+project_name: "gointern-backend"
+gitUrl: "https://github.com/kimseungwook/sukim-backend-system"
+
+# 🌐 공통 레지스트리 설정
+# ===================================================================
+container_registry_url: "gdhb.goyoai.com/gointern"
+container_registry_cache_url: "gdhb.goyoai.com/gointern-cache"
+container_registry_secretName: "harbor-registry-secret"
+
+# 🐳 공통 이미지 설정
+# ===================================================================
+common_alpine_url: "gdhb.goyoai.com/common/alpine:3.20.3"
+common_alpine_git_url: "gdhb.goyoai.com/common/git:2.45.2"
+common_kaniko_url: "gdhb.goyoai.com/common/kaniko:1.23.2"
+
+# 💾 공통 스토리지 설정
+# ===================================================================
+storage_ClassName: "oci-bv"
+storage_size: "1Gi"  # 캐시 크기
+
+# 🔗 Kustomize 공통 설정
+# ===================================================================
+kustomize_git_url: "https://github.com/GoyoAi-Service/goyoai-web-manifest"
+manifestFileName: "goyoai-backend-system-manifest.yaml"
+commitMessage: "Update Kubernetes manifest"
+
+# 📢 알림 설정
+# ===================================================================
+slack_webhook_url: "https://hooks.slack.com/services/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"
+
+# ===================================================================
+# 🔷 SYSTEM 모듈 설정
+# ===================================================================
+system:
+  # Git 설정
+  gitBranch: "dev-system"
+  
+  # 빌드 설정
+  moduleName: "goyoai-gointern-system"
+  dockerfileName: "dockerfile-system-dev"
+  
+  # Kustomize 설정
+  kustomize:
+    branch: "dev"
+    directory: "goyoai-backend-system/overlays/dev"
+    deploymentName: "dev-goyoai-backend-system"
+  
+  # PVC 설정 (ReadWriteOnce 독립)
+  pvc:
+    workspace: "gointern-backend-system"
+    cache: "gointern-system-gradle-cache"
+  
+  # Task 이름
+  buildTaskName: "goyoai-gointern-system-image-build"
+
+# 기존 호환성을 위한 별칭 설정 (System)
+gitRevisions: ["dev-portal", "dev-system", "dev-aify"]
+back_kustomize_git_branch: "dev"
+back_kustomize_directory: "goyoai-backend-system/overlays/dev"
+back_deployment_name: "dev-goyoai-backend-system"
+system_gradle_cache_pvc_name: "gointern-system-gradle-cache"
+system_build_task_name: "goyoai-gointern-system-image-build"
+
+# ===================================================================
+# 🔶 PORTAL 모듈 설정
+# ===================================================================
+portal:
+  # Git 설정
+  gitBranch: "dev-portal"
+  
+  # 빌드 설정
+  moduleName: "goyoai-gointern-portal"
+  dockerfileName: "dockerfile-portal-dev"
+  
+  # Kustomize 설정
+  kustomize:
+    branch: "dev"
+    directory: "goyoai-web-back-portal-v2/overlays/dev"
+    deploymentName: "goyoai-web-back-portal-v2"
+  
+  # PVC 설정 (ReadWriteOnce 독립)
+  pvc:
+    workspace: "gointern-backend-portal"
+    cache: "gointern-portal-gradle-cache"
+  
+  # Task 이름
+  buildTaskName: "goyoai-gointern-portal-image-build"
+
+# 기존 호환성을 위한 별칭 설정 (Portal)
+portal_kustomize_git_branch: "dev"
+portal_kustomize_directory: "goyoai-web-back-portal-v2/overlays/dev"
+portal_deployment_name: "goyoai-web-back-portal-v2"
+portal_gradle_cache_pvc_name: "gointern-portal-gradle-cache"
+portal_build_task_name: "goyoai-gointern-portal-image-build"
+
+# ===================================================================
+# 🔸 AIFY 모듈 설정
+# ===================================================================
+aify:
+  # Git 설정
+  gitBranch: "dev-aify"
+  
+  # 빌드 설정
+  moduleName: "goyoai-gointern-aify"
+  dockerfileName: "dockerfile-aify-dev"
+  
+  # Kustomize 설정
+  kustomize:
+    branch: "dev"
+    directory: "goyoai-aify-system/overlays/dev"
+    deploymentName: "dev-goyoai-aify-system"
+  
+  # PVC 설정 (ReadWriteOnce 독립)
+  pvc:
+    workspace: "gointern-backend-aify"
+    cache: "gointern-aify-gradle-cache"
+  
+  # Task 이름
+  buildTaskName: "goyoai-gointern-aify-image-build"
+
+# 기존 호환성을 위한 별칭 설정 (Aify)
+aify_kustomize_git_branch: "dev"
+aify_kustomize_directory: "goyoai-aify-system/overlays/dev"
+aify_deployment_name: "dev-goyoai-aify-system"
+aify_gradle_cache_pvc_name: "gointern-aify-gradle-cache"
+aify_build_task_name: "goyoai-gointern-aify-image-build"
+
+# ===================================================================
+# 🎯 EventListener 설정
+# ===================================================================
+eventListener:
+  serviceAccountName: "tekton-triggers-sa"
+  
+  # 노드 선택자
+  nodeSelector:
+    key: "goyo-svc"
+    value: "deploy"
+  
+  # Tolerations
+  tolerations:
+    key: "goyo-svc"
+    value: "deploy"
+    operator: "Equal"
+    effect: "NoSchedule"
+  
+  # 리소스 제한
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "250m"
+    limits:
+      memory: "128Mi"
+      cpu: "500m"
+
+# 기존 호환성을 위한 별칭 설정 (EventListener)
+el_serviceAccountName: "tekton-triggers-sa"
+el_node_selector_key: "goyo-svc"
+el_node_selector_value: "deploy"
+el_tolerations_key: "goyo-svc"
+el_tolerations_value: "deploy"
+el_tolerations_operator: "Equal"
+el_tolerations_effect: "NoSchedule"
+
+# ===================================================================
+# 🔐 서비스 어카운트 설정
+# ===================================================================
+serviceAccounts:
+  git: "tekton-sukim-token"
+  triggers: "tekton-triggers-sa"
+
+# 기존 호환성을 위한 별칭
+git_serviceAccountName: "tekton-sukim-token"
+
+# ===================================================================
+# 🚀 트리거 설정
+# ===================================================================
+trigger:
+  # 노드 선택자
+  nodeSelector:
+    key: "goyo-svc"
+    value: "deploy"
+  
+  # Affinity
+  affinity:
+    operator: "In"
+  
+  # Tolerations
+  tolerations:
+    key: "goyo-svc"
+    value: "deploy"
+    operator: "Equal"
+    effect: "NoSchedule"
+
+# 기존 호환성을 위한 별칭 설정 (Trigger)
+trigger_node_selector_key: "goyo-svc"
+trigger_node_selector_value: "deploy"
+trigger_node_affinity_operator: "In"
+trigger_tolerations_key: "goyo-svc"
+trigger_tolerations_value: "deploy"
+trigger_tolerations_operator: "Equal"
+trigger_tolerations_effect: "NoSchedule"
+
+# ===================================================================
+# 🏷️ 공통 라벨 및 어노테이션
+# ===================================================================
+commonLabels:
+  app: "tekton-backend-system"
+  version: "v2.0.0"
+  team: "devops"
+  environment: "development"
+  
+commonAnnotations:
+  "tekton.dev/pipelines.minVersion": "0.17.0"
+  "tekton.dev/categories": "Image Build"
+  "tekton.dev/tags": "image-build,backend,mono-repo"
+  "helm.sh/resource-policy": "keep"
+
+# ===================================================================
+# 🔧 고급 설정 (옵션)
+# ===================================================================
+advanced:
+  # 빌드 최적화
+  gradle:
+    opts: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.workers.max=2 -Dorg.gradle.caching=true -Dorg.gradle.vfs.watch=false -Dkotlin.compiler.execution.strategy=in-process"
+    userHome: "/workspace/gradle-home"
+  
+  # Kaniko 최적화
+  kaniko:
+    args:
+      - "--force"
+      - "--skip-tls-verify" 
+      - "--skip-unused-stages"
+      - "--use-new-run"
+      - "--cache=true"
+      - "--cache-ttl=168h"
+      - "--cache-copy-layers"
+      - "--snapshot-mode=redo"
+      - "--compressed-caching=false"
+      - "--ignore-var-run"
+      - "--cleanup"
+      - "--cache-dir=/cache"
+  
+  # 타임아웃 설정
+  timeouts:
+    pipeline: "2h0m0s"
+    tasks: "1h30m0s"
+    finally: "15m0s"
+  
+  # 정리 설정
+  cleanup:
+    enabled: true
+    schedule: "0 2 * * *"  # 매일 새벽 2시
+    retentionDays: 7
+
+# ===================================================================
+# 📊 모니터링 설정 (옵션)
+# ===================================================================
+monitoring:
+  enabled: false
+  prometheus:
+    enabled: false
+    serviceMonitor: false
+  grafana:
+    enabled: false
+    dashboard: false
+
+# ===================================================================
+# 🔒 보안 설정
+# ===================================================================
+security:
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    runAsNonRoot: false  # Kaniko는 root 권한 필요
+    capabilities:
+      drop:
+        - ALL
+
+# ===================================================================
+# 🌟 새 모듈 추가 템플릿 (확장용)
+# ===================================================================
+# 새로운 모듈 추가 시 아래 템플릿을 참고하세요
+# 
+# newModule:
+#   gitBranch: "dev-new"
+#   moduleName: "goyoai-gointern-new"
+#   dockerfileName: "dockerfile-new-dev"
+#   kustomize:
+#     branch: "dev"
+#     directory: "goyoai-new-system/overlays/dev"
+#     deploymentName: "dev-goyoai-new-system"
+#   pvc:
+#     workspace: "gointern-backend-new"
+#     cache: "gointern-new-gradle-cache"
+#   buildTaskName: "goyoai-gointern-new-image-build"
+
+# ===================================================================
+# 📝 설정 가이드
+# ===================================================================
+# 
+# 🔹 새 모듈 추가 방법:
+# 1. 위의 템플릿을 복사하여 새 모듈 섹션 추가
+# 2. gitRevisions 배열에 새 브랜치 추가
+# 3. EventListener의 CEL 표현식에 새 모듈 조건 추가
+# 4. 필요시 새 파이프라인 및 태스크 템플릿 생성
+# 
+# 🔹 PVC 크기 조정:
+# storage_size 값을 수정하여 캐시 크기 조정 가능
+# 
+# 🔹 리소스 제한 조정:
+# eventListener.resources에서 CPU/메모리 제한 조정
+# 
+# 🔹 노드 스케줄링 변경:
+# nodeSelector, tolerations 섹션에서 배포 노드 제어
+# 
+# ===================================================================

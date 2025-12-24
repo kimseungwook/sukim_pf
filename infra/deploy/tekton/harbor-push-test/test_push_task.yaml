@@ -1,0 +1,60 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: harbor-nginx-image-build
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: image-name
+      type: string
+      default: goyoai-web/goyoai-web-back-dev
+    - name: image-tag
+      type: string
+      default: latest
+  workspaces:
+    - name: source
+      description: Holds the source code and Dockerfile
+    - name: dockerconfig
+      description: Includes a docker `config.json`
+      optional: true
+      mountPath: /kaniko/.docker
+  steps:
+    - name: create-dockerfile
+      image: busybox
+      script: |
+        #!/bin/sh
+        cat > $(workspaces.source.path)/Dockerfile <<EOF
+        FROM nginx:latest
+        COPY index.html /usr/share/nginx/html/
+        EOF
+        
+        cat > $(workspaces.source.path)/index.html <<EOF
+        <html>
+          <head>
+            <title>Test Page</title>
+          </head>
+          <body>
+            <h1>Hello, World!</h1>
+            <p>This is a test page.</p>
+          </body>
+        </html>
+        EOF
+    - name: build-and-push
+      image: gcr.io/kaniko-project/executor:v1.7.0-debug
+      # command:
+      #   - /kaniko/executor
+      args:
+        - --context=$(workspaces.source.path)
+        - --dockerfile=$(workspaces.source.path)/Dockerfile
+        - --destination=gdharbor.goyoai.com/$(params.image-name):$(params.image-tag)
+        # - --registry-mirror=https://gdharbor.goyoai.com
+        # - --force
+        - --insecure
+        - --skip-tls-verify
+        - --skip-tls-verify-pull
+        - --insecure-pull
+        # - --cache=false
+        # - --docker-config=$(workspaces.dockerconfig.path)
+        
+      securityContext:
+        runAsUser: 0

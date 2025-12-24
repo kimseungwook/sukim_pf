@@ -1,144 +1,167 @@
 global:
-  storageClass: "oci-bv" # Use Oracle Cloud Infrastructure Block Volume
+  storageClass: "oci-bv"
+  extraEnvFrom:
+    - secretRef:
+        name: objstore-secret
+  extraArgs:
+    - "-config.expand-env=true"
+
 loki:
   enabled: true
-  limits_config:
-    retention_period: 90d                   # 보존 기간을 더 길게
-    max_chunk_age: 6h                       # 청크 보존 시간을 더 길게  
-    reject_old_samples: false               # 오래된 샘플 허용 (임시)
-    reject_old_samples_max_age: 720h        # 30일로 확장
-    ingestion_rate_mb: 50                   # 제한을 더 완화
-    ingestion_burst_size_mb: 100            
-    max_streams_per_user: 0                 
-    max_line_size: 512000                   # 더 큰 라인 크기 허용
+  auth_enabled: false
   
-  # table_manager 설정을 더 관대하게
-  table_manager:
-    retention_deletes_enabled: false        # 임시로 삭제 비활성화
-    retention_period: 90d                   # 더 긴 보존 기간
-    index_tables_provisioning:
-      enable_ondemand_throughput_mode: false
-      provisioned_read_throughput: 0
-      provisioned_write_throughput: 0
-  
-  # compactor 비활성화 (임시)
-  compactor:
-    working_directory: /var/loki/compactor
-    shared_store: s3
-    compaction_interval: 30m               # 더 긴 간격
-    retention_enabled: false               # 임시로 비활성화
-    retention_delete_delay: 24h            # 더 긴 지연 시간
-    retention_delete_worker_count: 10      # 워커 수 감소
+  # Helm Chart 6.x / Loki 3.x SimpleScalable recommendation
+  deploymentMode: SimpleScalable
+  replication_factor: 1
 
   schemaConfig:
     configs:
       - from: 2024-01-01
-        store: boltdb-shipper
+        store: tsdb
         object_store: s3
-        schema: v12
+        schema: v13
         index:
           prefix: loki_index_
           period: 24h
-  storageConfig:
-    aws:
-      access_key_id: 4b8eb9627f942003c8b3d6b66fc6f6caefcb1b9a
-      secret_access_key: "+hULmOEAxJI7sgAHZoGBow53K3EQsGbc52thwJKP7X8="
-      s3forcepathstyle: true
+
+  storage:
+    type: s3
+    bucketNames:
+      chunks: loki-bucket-sukim
+      ruler: loki-bucket-sukim
+      admin: loki-bucket-sukim
+    s3:
       endpoint: cn7ipyag4bte.compat.objectstorage.ap-seoul-1.oraclecloud.com
       region: ap-seoul-1
-      bucketnames: loki-bucket-prd
-    boltdb_shipper:
-      active_index_directory: /var/loki/index
-      cache_location: /var/loki/cache
-      shared_store: s3
-      cache_ttl: 24h
-    filesystem:
-      directory: /var/loki/chunks
-  auth_enabled: false
-  replication_factor: 1
+      accessKeyId: "${AWS_ACCESS_KEY_ID}"
+      secretAccessKey: "${AWS_SECRET_ACCESS_KEY}"
+      s3ForcePathStyle: true
 
-ingester:
+  limits_config:
+    retention_period: 90d
+    reject_old_samples: false
+    reject_old_samples_max_age: 720h
+    ingestion_rate_mb: 50
+    ingestion_burst_size_mb: 100
+    max_streams_per_user: 0
+    max_line_size: 512000
+
+  table_manager:
+    retention_deletes_enabled: false
+    retention_period: 90d
+    index_tables_provisioning:
+      enable_ondemand_throughput_mode: false
+      provisioned_read_throughput: 0
+      provisioned_write_throughput: 0
+
+  compactor:
+    working_directory: /var/loki/compactor
+
+    compaction_interval: 30m
+    retention_enabled: false
+    retention_delete_delay: 24h
+    retention_delete_worker_count: 10
+
+# SimpleScalable Components: write, read, backend
+
+write:
   replicas: 1
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution: []
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/component: write
+                app.kubernetes.io/name: loki
+                app.kubernetes.io/instance: loki
+            topologyKey: kubernetes.io/hostname
   persistence:
     enabled: true
     size: 50Gi
     storageClass: "oci-bv"
   nodeSelector:
-    goyo-svc: "monitoring"
-  tolerations: #[]
-  - key: "goyo-svc"
-    operator: "Equal"
-    value: "monitoring"
-    effect: "NoSchedule"
-distributor:
-  replicas: 1
-  nodeSelector:
-    goyo-svc: "monitoring"
-  tolerations: #[]
-  - key: "goyo-svc"
-    operator: "Equal"
-    value: "monitoring"
-    effect: "NoSchedule"
+    service: "monitoring"
 
-querier:
+read:
   replicas: 1
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution: []
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/component: read
+                app.kubernetes.io/name: loki
+                app.kubernetes.io/instance: loki
+            topologyKey: kubernetes.io/hostname
   persistence:
     enabled: true
     size: 50Gi
     storageClass: "oci-bv"
   nodeSelector:
-    goyo-svc: "monitoring"
-  tolerations: #[]
-  - key: "goyo-svc"
-    operator: "Equal"
-    value: "monitoring"
-    effect: "NoSchedule"
+    service: "monitoring"
 
-queryFrontend:
+backend:
   replicas: 1
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution: []
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/component: backend
+                app.kubernetes.io/name: loki
+                app.kubernetes.io/instance: loki
+            topologyKey: kubernetes.io/hostname
+  persistence:
+    enabled: true
+    size: 50Gi
+    storageClass: "oci-bv"
   nodeSelector:
-    goyo-svc: "monitoring"
-  tolerations: #[]
-  - key: "goyo-svc"
-    operator: "Equal"
-    value: "monitoring"
-    effect: "NoSchedule"
+    service: "monitoring"
+
+# Gateway (Nginx)
 gateway:
   replicas: 1
-  tolerations:
-  - key: "goyo-svc"
-    operator: "Equal"
-    value: "monitoring"
-    effect: "NoSchedule"
-  - key: "goyo-svc"
-    operator: "Exists"
-    effect: "NoSchedule"
+  nodeSelector:
+    service: "monitoring"
 
+memcached:
+  image:
+    # -- Memcached Docker image repository
+    repository: "docker.io/memcached"
+    # -- Memcached Docker image tag
+    tag: 1.6.39-alpine
+memcachedExporter:
+  image:
+    repository: "docker.io/prom/memcached-exporter"
+    tag: v0.15.4
+    pullPolicy: IfNotPresent
 serviceAccount:
   create: true
 
 rbac:
-  create: false
+  create: true
 
 networkPolicy:
-  enabled: false
+  enabled: true
 
 serviceMonitor:
-  enabled: false
+  enabled: true
+  labels:
+    release: prometheus-stack
 
+# Disable unused components
 grafana:
   enabled: false
-
 alertmanager:
   enabled: false
-
 prometheus:
   enabled: false
-
-monitoring:
-  serviceMonitor:
-    enabled: true
-  dashboards:
-    enabled: true
-  rules:
-    enabled: true

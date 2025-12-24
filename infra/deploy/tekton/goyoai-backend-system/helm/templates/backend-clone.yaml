@@ -1,0 +1,136 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: {{ .Values.project_name }}-git-clone
+  namespace: tekton-pipelines
+spec:
+  workspaces:
+    - name: {{ .Values.project_name }}
+  params:
+    - name: revision
+      type: string
+    - name: giturl
+      type: string
+    - name: project-name
+      type: string
+      default: {{ .Values.project_name }}
+    - name: module-name
+      type: string
+      description: "The module to build"
+    - name: author-name
+      type: string
+      description: "Git commit author name"
+    - name: commit-message
+      type: string
+      description: "Git commit message"
+  results:
+    - name: commit
+      description: The git commit hash
+  steps:
+    - name: clean-workspace
+      image: {{ .Values.common_alpine_url }}
+      script: |
+        #!/bin/sh
+        WORKSPACE_PATH=$(workspaces.{{ .Values.project_name }}.path)
+        MODULE_DIR=$WORKSPACE_PATH/$(params.module-name)
+        PROJECT_DIR=$MODULE_DIR/source
+        
+        # Create project directory if not exists
+        mkdir -p $PROJECT_DIR
+        # Clean the workspace
+        rm -rf $PROJECT_DIR/.[!.]* $PROJECT_DIR/*
+        if [ "$(ls -A $PROJECT_DIR)" ]; then
+          echo "Project directory is not empty after cleaning."
+          ls -al $PROJECT_DIR
+          exit 1
+        else
+          echo "Project directory is now clean."
+        fi
+    - name: clone-repository
+      image: {{ .Values.common_alpine_git_url }}
+      script: |
+        #!/bin/sh
+        WORKSPACE_PATH=$(workspaces.{{ .Values.project_name }}.path)
+        MODULE_DIR=$WORKSPACE_PATH/$(params.module-name)
+        PROJECT_DIR=$MODULE_DIR/source
+        
+        mkdir -p $PROJECT_DIR
+        git config --global --add safe.directory $PROJECT_DIR
+        # Clone the repository
+        git clone -b $(params.revision) $(params.giturl) $PROJECT_DIR
+        cd $PROJECT_DIR
+        # Capture commit hash
+        git rev-parse --short HEAD > $(results.commit.path)
+          
+    - name: notify-slack
+      image: {{ .Values.common_alpine_url }}
+      script: |
+        #!/bin/sh
+        apk add --no-cache curl tzdata
+
+        SLACK_WEBHOOK_URL="{{ .Values.slack_webhook_url }}"
+        MODULE_NAME="$(params.module-name)"
+        AUTHOR_NAME="$(params.author-name)"
+        COMMIT_MESSAGE="$(params.commit-message)"
+
+        # 현재 시간 (KST)
+        CURRENT_TIME=$(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M:%S')
+
+        # 🎨 상세한 Slack Block Kit 메시지
+        SLACK_MESSAGE=$(cat <<EOF
+        {
+          "blocks": [
+            {
+              "type": "header",
+              "text": {
+                "type": "plain_text",
+                "text": "✅ GoyoAI-Gointern-Start",
+                "emoji": true
+              }
+            },
+            {
+              "type": "section",
+              "fields": [
+                {
+                  "type": "mrkdwn",
+                  "text": "*Module:*\n\`${MODULE_NAME}\`"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Status:*\n:white_check_mark: Start"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Committer:*\n${AUTHOR_NAME}"
+                },
+                {
+                  "type": "mrkdwn",
+                  "text": "*Commit Message:*\n${COMMIT_MESSAGE}"
+                }
+              ]
+            },
+            {
+              "type": "context",
+              "elements": [
+                {
+                  "type": "mrkdwn",
+                  "text": "⏰ ${CURRENT_TIME} KST | 📦 Goyoai-Backend-System-CI"
+                }
+              ]
+            },
+            {
+              "type": "divider"
+            }
+          ]
+        }
+        EOF
+        )
+
+        # Slack 알림 전송 (실패해도 빌드는 성공으로 처리)
+        if curl -X POST -H 'Content-type: application/json' \
+          --data "$SLACK_MESSAGE" \
+          $SLACK_WEBHOOK_URL; then
+          echo "✅ Slack notification sent Start"
+        else
+          echo "⚠️  Slack notification failed (non-critical)"
+        fi

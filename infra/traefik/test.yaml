@@ -1,0 +1,16 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: debug-catch-all
+  namespace: goyoai-web
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - kind: Rule
+      match: HostRegexp(`{host:.+}`)
+      priority: 1
+      services:
+        - name: whoami  # 또는 테스트용 서비스
+          port: 80

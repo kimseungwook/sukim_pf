@@ -1,0 +1,16 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  # [WARNING] 이름 규칙 오류 해결 (default 추가)
+  name: {{ .Values.project_name | default .Chart.Name }}-harbor-binding
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: module-name
+      value: $(extensions.module_name)
+    - name: image-tag
+      value: $(extensions.image_tag)
+    - name: container-registry-url
+      value: $(extensions.registry_url)
+    - name: commit-message
+      value: "Update manifest from Harbor push"

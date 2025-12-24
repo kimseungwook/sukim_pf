@@ -2,103 +2,96 @@ global:
   clusterDomain: 'cluster.local'
   dnsService: 'kube-dns'
   dnsNamespace: 'kube-system'
+  extraEnvFrom:
+    - secretRef:
+        name: objstore-secret
 
 tempo:
   image:
     registry: docker.io
     repository: grafana/tempo
     pullPolicy: IfNotPresent
+  extraArgs:
+    - "-config.expand-env=true"
 
 serviceAccount:
   create: true
-  config:
-    storage:
-      remote_write:
-        - url: "http://prometheus-operated.prometheus.svc.cluster.local:9090/api/v1/write"
 
 traces:
   otlp:
     http:
-      enabled: true  # Enable HTTP communication
+      enabled: true
     grpc:
-      enabled: true  # Enable GRPC communication
-metricsGenerator:
-  enabled: true
+      enabled: true
 
 storage:
   trace:
     backend: s3
     s3:
-      bucket: tempo-bucket-prd
+      bucket: tempo-bucket-sukim
       endpoint: cn7ipyag4bte.compat.objectstorage.ap-seoul-1.oraclecloud.com
-      access_key: 4b8eb9627f942003c8b3d6b66fc6f6caefcb1b9a
-      secret_key: "+hULmOEAxJI7sgAHZoGBow53K3EQsGbc52thwJKP7X8="
+      region: ap-seoul-1
+      access_key: "${AWS_ACCESS_KEY_ID}"
+      secret_key: "${AWS_SECRET_ACCESS_KEY}"
       insecure: false
+      forcepathstyle: true
+
 memcached:
+  enabled: true
+  replicas: 1
   nodeSelector:
-    goyo-svc: "monitoring"
-  tolerations: #[]
-  - key: "goyo-svc"
-    operator: "Equal"
-    value: "monitoring"
-    effect: "NoSchedule"
-    
+    service: "monitoring"
+memcachedExporter:
+  enabled: true
+  image:
+    repository: "prom/memcached-exporter"
+    tag: v0.15.4
+    pullPolicy: IfNotPresent
+
 ingester:
   replicas: 1
   nodeSelector:
-    goyo-svc: "monitoring"
-  tolerations: #[]
-  - key: "goyo-svc"
-    operator: "Equal"
-    value: "monitoring"
-    effect: "NoSchedule"
+    service: "monitoring"
+  extraArgs:
+    - "-config.expand-env=true"
   config:
     replication_factor: 1
 
 distributor:
   replicas: 1
   nodeSelector:
-    goyo-svc: "monitoring"
-  tolerations: #[]
-  - key: "goyo-svc"
-    operator: "Equal"
-    value: "monitoring"
-    effect: "NoSchedule"
-  # extraArgs:
-  #   "distributor.log-received-traces": true
-
+    service: "monitoring"
+  extraArgs:
+    - "-config.expand-env=true"
 
 querier:
   replicas: 1
   nodeSelector:
-    goyo-svc: "monitoring"
-  tolerations: #[]
-  - key: "goyo-svc"
-    operator: "Equal"
-    value: "monitoring"
-    effect: "NoSchedule"
+    service: "monitoring"
+  extraArgs:
+    - "-config.expand-env=true"
 
 compactor:
   replicas: 1
   nodeSelector:
-    goyo-svc: "monitoring"
-  tolerations: #[]
-  - key: "goyo-svc"
-    operator: "Equal"
-    value: "monitoring"
-    effect: "NoSchedule"
+    service: "monitoring"
+  extraArgs:
+    - "-config.expand-env=true"
 
 queryFrontend:
   replicas: 1
   nodeSelector:
-    goyo-svc: "monitoring"
-  tolerations: #[]
-  - key: "goyo-svc"
-    operator: "Equal"
-    value: "monitoring"
-    effect: "NoSchedule"
+    service: "monitoring"
+  extraArgs:
+    - "-config.expand-env=true"
 
-# gateway:
-#   enabled: true
-#   nodeSelector:
-#     service: "monitoring"
+metricsGenerator:
+  enabled: true
+  nodeSelector:
+    service: "monitoring"
+  extraArgs:
+    - "-config.expand-env=true"
+  config:
+    storage:
+      remote_write:
+        - url: "http://prometheus-operated.prometheus.svc.cluster.local:9090/api/v1/write"

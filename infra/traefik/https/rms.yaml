@@ -1,0 +1,26 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: rms-https
+  namespace: traefik
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`rms.bbrick.com`)
+      priority: 10
+      services:
+        - name: rms
+          namespace: rms
+          port: 5000
+    - kind: Rule
+      match: Host(`rms.bbrick.com`) && PathPrefix(`/grpc`)
+      priority: 11
+      services:
+        - name: rms
+          namespace: rms
+          port: 5000
+          scheme: h2c
+  tls:
+    secretName: goyoai-webs-tls

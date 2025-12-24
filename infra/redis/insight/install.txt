@@ -1,0 +1,3 @@
+helm repo add redisinsight-gui https://mrnim94.github.io/redisinsight/
+
+helm upgrade --install goyo-redisinsight redisinsight-gui/redisinsight -f redis/insight/values.yaml -n redis --create-namespace

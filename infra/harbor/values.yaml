@@ -1,0 +1,140 @@
+# expose:
+#   type: nodePort
+#   tls:
+#     enabled: true
+#     certSource: auto
+#     auto:
+#       commonName: "harbor.goyoai.svc.cluster.local"
+#   nodePort:
+#     name: harbor
+#     ports:
+#       http:
+#         port: 80
+#         nodePort: 30002
+#       https:
+#         port: 443
+#         nodePort: 30003
+
+# externalURL: https://harbor.goyoai.svc.cluster.local:30003
+expose:
+  type: ingress
+  tls:
+    enabled: true
+    certSource: secret
+    auto:
+      commonName: "gdhb.go-intern.io"
+    secret:
+      secretName: "goyo-harbor-tls"
+  ingress:
+    hosts:
+      core: gdhb.go-intern.io
+    className: "gointern-backoffice-traefik"
+  # ClusterIP 서비스 추가 설정
+  clusterIP:
+    name: harbor-internal
+    ports:
+      httpPort: 80
+      httpsPort: 443
+
+externalURL: https://gdhb.go-intern.io
+# internalTLS:
+#   enabled: true
+#   certSource: "auto"
+
+persistence:
+  enabled: true
+  resourcePolicy: "keep"
+  # persistentVolumeClaim:
+  #   registry:
+  #     existingClaim: "goyo-harbor-registry"
+  #     accessMode: ReadWriteOnce
+  #     size: 50Gi
+#     jobservice:
+#       jobLog:
+#         existingClaim: "goyoai-web-harbor-jobservice-pvc"
+#         accessMode: ReadWriteMany
+#         size: 10Gi
+#     redis:
+#       existingClaim: "goyoai-web-harbor-redis-pvc"
+#       accessMode: ReadWriteMany
+#       size: 10Gi
+#     # trivy:
+#     #   existingClaim: "goyoai-web-harbor-trivy-pvc"
+#     #   accessMode: ReadWriteMany
+#     #   size: 10Gi
+
+  imageChartStorage:
+    disableredirect: false
+    type: s3
+    s3:
+      region: ap-seoul-1 # S3 버킷이 위치한 리전을 입력
+      bucket: harbor-container-repo # S3 버킷 이름
+      accesskey: 4b8eb9627f942003c8b3d6b66fc6f6caefcb1b9a # S3 접근을 위한 Access Key
+      secretkey: "+hULmOEAxJI7sgAHZoGBow53K3EQsGbc52thwJKP7X8=" # S3 접근을 위한 Secret Key
+      regionendpoint: cn7ipyag4bte.compat.objectstorage.ap-seoul-1.oraclecloud.com
+      secure: true # HTTPS를 통해 S3에 접근
+      chunksize: "5242880" # 5MB의 청크 사이즈 (필요에 따라 조정 가능)
+      # rootdirectory: harbor-container-repo # S3에서 파일을 저장할 루트 디렉토리 설정 (옵션)
+commonSettings: &commonSettings
+  nodeSelector:
+    goyo-svc: sentryAMD64
+
+database:
+  internal:
+    image:
+      repository: docker.io/goharbor/harbor-db
+      tag: v2.14.0
+    password: "goyoai123!@#"
+    <<: *commonSettings
+
+redis:
+  internal:
+    image:
+      repository: docker.io/goharbor/redis-photon
+      tag: v2.14.0
+    <<: *commonSettings
+
+portal:
+  image:
+    repository: docker.io/goharbor/harbor-portal
+    tag: v2.14.0
+  <<: *commonSettings
+
+core:
+  image:
+    repository: docker.io/goharbor/harbor-core
+    tag: v2.14.0
+  <<: *commonSettings
+
+jobservice:
+  image:
+    repository: docker.io/goharbor/harbor-jobservice
+    tag: v2.14.0
+  <<: *commonSettings
+
+registry:
+  registry:
+    image:
+      repository: docker.io/goharbor/registry-photon
+      tag: v2.14.0
+  controller:
+    image:
+      repository: docker.io/goharbor/harbor-registryctl
+      tag: v2.14.0
+  credentials:
+    username: "goyoai_harbor"
+    password: "pbDXO5JbzsQhOmr9IGdRqEcZl7C8cPTQwAb4hfccNI334zXbew"
+  <<: *commonSettings
+
+trivy:
+  image:
+    repository: docker.io/goharbor/trivy-adapter-photon
+    tag: v2.14.0
+  <<: *commonSettings
+
+nginx:
+  <<: *commonSettings
+
+logLevel: debug
+secretKey: "Yd!x3aQw8zTuE9fR"
+harborAdminPassword: "Goyoai123!@#"

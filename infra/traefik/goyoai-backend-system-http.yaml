@@ -1,0 +1,51 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: goyoai-backend-system-http
+  namespace: goyoai-web
+spec:
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: Host(`devapi2.goyoai.com`)
+      priority: 10
+      services:
+        - name: goyoai-gointern-system
+          namespace: goyoai-web
+          port: 5000
+    - kind: Rule
+      match: Host(`devapi2-portal.goyoai.com`)
+      priority: 10
+      services:
+        - name: goyoai-gointern-portal
+          namespace: goyoai-web
+          port: 5000
+    - kind: Rule
+      match: Host(`devapi-aify.goyoai.com`)
+      priority: 10
+      services:
+        - name: goyoai-aify-system
+          namespace: goyoai-web
+          port: 5000
+    - kind: Rule
+      match: Host(`devapi-aify-portal.goyoai.com`)
+      priority: 10
+      services:
+        - name: goyoai-aify-portal
+          namespace: goyoai-web
+          port: 5000
+    - kind: Rule
+      match: Host(`studioapi.aify.ai`)
+      priority: 10
+      services:
+        - name: goyoai-aify-system
+          namespace: goyoai-web
+          port: 5000
+    - kind: Rule
+      match: Host(`studioapi-portal.aify.ai`)
+      priority: 10
+      services:
+        - name: goyoai-aify-portal
+          namespace: goyoai-web
+          port: 5000

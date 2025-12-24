@@ -1,3 +1,3 @@
 
 helm repo add grafana https://grafana.github.io/helm-charts
-helm upgrade --install goyo-loki-distributed grafana/loki-distributed -f lgtm/loki/values.yaml -n monitoring
+helm upgrade --install loki grafana/loki --version 6.49.0 -f lgtm/loki_stack/values.yaml -n monitoring

@@ -1,0 +1,77 @@
+global:
+  enabled: true
+  tlsDisable: true  # 개발 환경에서는 TLS 비활성화
+
+server:
+  # 지정한 노드에만 배포
+  image:
+    repository: docker.io/hashicorp/vault
+    tag: 1.20.4
+  nodeSelector:
+    goyo-svc: sentryAMD64
+  
+  # 개발 환경에서는 리소스 요청 낮게 설정
+  resources:
+    requests:
+      memory: 128Mi
+      cpu: 100m
+    limits:
+      memory: 256Mi
+      cpu: 200m
+  
+  # 개발 환경에서는 더 작은 저장소 크기 사용
+  dataStorage:
+    enabled: true
+    size: 1Gi
+  
+  # dev 모드 대신 standalone 모드 사용 (데이터 유지를 위해)
+  standalone:
+    enabled: true
+    config: |-
+      ui = true
+      
+      listener "tcp" {
+        tls_disable = 1
+        address = "[::]:8200"
+        cluster_address = "[::]:8201"
+      }
+      
+      storage "file" {
+        path = "/vault/data"
+      }
+  
+  # 개발 환경에서는 dev 모드도 고려 가능 (자동 초기화/언실 + 루트 토큰 생성)
+  # 단, 다시 시작하면 모든 데이터 손실
+  # dev:
+  #   enabled: true
+  #   devRootToken: "root"
+
+  # HA 모드는 개발 환경에서 불필요
+  ha:
+    enabled: false
+
+injector:
+  enabled: true
+  image:
+    repository: docker.io/hashicorp/vault-k8s
+    tag: 1.7.0
+  nodeSelector:
+    goyo-svc: sentryAMD64
+  
+  # 개발 환경에서는 리소스 요청 낮게 설정
+  resources:
+    requests:
+      memory: 128Mi
+      cpu: 100m
+    limits:
+      memory: 256Mi
+      cpu: 200m
+
+# UI는 개발 환경에서 유용
+ui:
+  enabled: true
+  serviceType: "ClusterIP"
+
+# CSI 드라이버는 필요 없으면 비활성화
+csi:
+  enabled: false

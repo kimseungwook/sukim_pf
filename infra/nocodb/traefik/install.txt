@@ -1,0 +1,5 @@
+helm upgrade --install nocodb-traefik traefik/traefik -f nocodb/traefik/traefik-values.yaml -n nocodb
+
+k apply -f nocodb/traefik/ingress-route-http.yaml
+k apply -f nocodb/traefik/ingress-route-https.yaml
+k apply -f nocodb/traefik/middleware-http-https.yaml

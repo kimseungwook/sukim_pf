@@ -1,0 +1,2 @@
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm upgrade --install nocodb-redis bitnami/redis --version 19.0.2 -n redis -f redis/nocodb/values.yaml

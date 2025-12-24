@@ -1,0 +1,87 @@
+global:
+  nodeSelector:
+    goyo-svc: deploy
+
+  # tolerations:
+  #   - key: "goyo-svc"
+  #     operator: "Equal"
+  #     value: "deploy"
+  #     effect: "NoSchedule"
+
+configs:
+  cm:
+    url: https://gdargo.go-intern.io
+    dex.config: |
+      connectors:
+      - type: oidc
+        id: authentik
+        name: authentik
+        config:
+          issuer: http://gdauth.go-intern.io/application/o/argocd/
+          clientID: hhNIGo2Ji2HXQxVNKst35aE3hN7LNXLx2cGZJLx6
+          clientSecret: $dex.authentik.clientSecret
+          insecureEnableGroups: true
+          insecureSkipVerify: true
+          scopes:
+            - openid
+            - profile
+            - email
+            - groups
+  params:
+    server.insecure: "true"
+    dexserver.disable.tls: "true"
+    server.dex.server: "http://goyo-argocd-dex-server:5556"
+
+  rbac:
+    policy.csv: |
+      g, ArgoCD Admins, role:admin
+      g, ArgoCD Viewers, role:readonly
+      # 그룹 매핑 (Authentik 그룹명 사용)
+      g, ArgoCD DevTeam, role:dev-team
+
+      # 기본 인프라 접근 권한
+      p, role:dev-team, clusters, get, *, allow
+      p, role:dev-team, projects, get, *, allow
+      p, role:dev-team, repositories, get, *, allow
+
+      # 레이블 기반 접근 제어 (올바른 문법)
+      p, role:dev-team, applications, action/get, team/dev-team, allow
+      p, role:dev-team, applications, action/sync, team/dev-team, allow
+
+commonSettings: &commonSettings
+  nodeSelector:
+    goyo-svc: deploy
+
+server:
+  extraArgs:
+    - --insecure
+  <<: *commonSettings
+  hostAliases:
+    - ip: "10.96.151.83"
+      hostnames:
+        - "gdauth.go-intern.io"
+        - "gdargo.go-intern.io"
+
+redis:
+  <<: *commonSettings
+
+controller:
+  <<: *commonSettings
+
+dex:
+  enabled: true
+  <<: *commonSettings
+  hostAliases:
+    - ip: "10.96.151.83"
+      hostnames:
+        - "gdauth.go-intern.io"
+        - "gdargo.go-intern.io"
+
+repoServer:
+  <<: *commonSettings
+
+applicationSet:
+  <<: *commonSettings
+
+notifications:
+  <<: *commonSettings

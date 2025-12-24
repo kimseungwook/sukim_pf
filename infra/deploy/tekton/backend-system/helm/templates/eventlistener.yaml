@@ -1,0 +1,160 @@
+# 모듈별로 시인성 좋게 정리된 EventListener (aify 제거)
+# templates/eventlistener.yaml
+# ===================================================================
+
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: {{ .Values.global.project_name }}
+  namespace: tekton-pipelines
+  labels:
+    {{- include "backend-system.labels" . | nindent 4 }}
+    type: event-listener
+  annotations:
+    description: "백엔드 시스템 통합 이벤트 리스너 (System, Portal)"
+spec:
+  serviceAccountName: {{ .Values.serviceAccounts.triggers }}
+  resources:
+    kubernetesResource:
+      spec:
+        template:
+          spec:
+            nodeSelector:
+              {{- toYaml .Values.eventListener.nodeSelector | nindent 14 }}
+            tolerations:
+              {{- toYaml .Values.eventListener.tolerations | nindent 14 }}
+            containers:
+              - resources:
+                  {{- toYaml .Values.eventListener.resources | nindent 18 }}
+
+  triggers:
+    # ===================================================================
+    # 🚀 Push 이벤트 트리거 (활성화된 모듈만 대응)
+    # ===================================================================
+    - name: {{ .Values.global.project_name }}-push
+      interceptors:
+        - ref:
+            name: "github"
+          params:
+            - name: "eventTypes"
+              value: ["push"]
+        - ref:
+            name: "cel"
+          params:
+            - name: "filter"
+              value: |
+                body.ref.split('/')[2] in [
+                  {{- range $moduleName, $moduleConfig := .Values.modules }}
+                  {{- if $moduleConfig.enabled }}
+                  '{{ $moduleConfig.git.branch }}',
+                  {{- end }}
+                  {{- end }}
+                ]
+            - name: "overlays"
+              value:
+                - key: sha
+                  expression: "body.head_commit.id"
+                - key: short_sha
+                  expression: "body.head_commit.id.truncate(7)"
+                - key: branch_name
+                  expression: "body.ref.split('/')[2]"
+                
+                # 🔷 모듈 매핑 (동적)
+                - key: module_name
+                  expression: |
+                    {{- range $moduleName, $moduleConfig := .Values.modules }}
+                    {{- if $moduleConfig.enabled }}
+                    body.ref.split('/')[2] == '{{ $moduleConfig.git.branch }}' ? '{{ $moduleConfig.build.moduleName }}' :
+                    {{- end }}
+                    {{- end }}
+                    'unknown'
+                
+                # 🔶 PVC 매핑 (Workspace)
+                - key: pvc_name
+                  expression: |
+                    {{- range $moduleName, $moduleConfig := .Values.modules }}
+                    {{- if $moduleConfig.enabled }}
+                    body.ref.split('/')[2] == '{{ $moduleConfig.git.branch }}' ? '{{ $moduleConfig.pvc.workspace }}' :
+                    {{- end }}
+                    {{- end }}
+                    'unknown'
+                
+                # 🔸 Dockerfile 매핑
+                - key: dockerfile_name
+                  expression: |
+                    {{- range $moduleName, $moduleConfig := .Values.modules }}
+                    {{- if $moduleConfig.enabled }}
+                    body.ref.split('/')[2] == '{{ $moduleConfig.git.branch }}' ? '{{ $moduleConfig.build.dockerfileName }}' :
+                    {{- end }}
+                    {{- end }}
+                    'dockerfile-system-dev'
+
+      bindings:
+        - ref: {{ .Values.global.project_name }}
+      template:
+        ref: {{ .Values.global.project_name }}
+
+    # ===================================================================
+    # 🔄 PR 이벤트 트리거 (deploy 라벨 기반)
+    # ===================================================================
+    - name: {{ .Values.global.project_name }}-pr-deploy
+      interceptors:
+        - ref:
+            name: "github"
+          params:
+            - name: "eventTypes"
+              value: ["pull_request"]
+        - ref:
+            name: "cel"
+          params:
+            - name: "filter"
+              value: |
+                body.action in ['opened', 'synchronize', 'reopened', 'labeled'] && 
+                body.pull_request.labels.exists(k, k.name=='deploy')
+            - name: "overlays"
+              value:
+                - key: sha
+                  expression: "body.pull_request.head.sha"
+                - key: short_sha
+                  expression: "body.pull_request.head.sha.truncate(7)"
+                - key: branch_name
+                  expression: "body.pull_request.head.ref"
+                - key: pr_number
+                  expression: "string(body.pull_request.number)"
+                
+                # PR 브랜치명으로 모듈 추론 (portal 키워드만 남김)
+                - key: module_name
+                  expression: |
+                    body.pull_request.head.ref.contains('portal') ? '{{ .Values.modules.portal.build.moduleName }}' : '{{ .Values.modules.system.build.moduleName }}'
+                
+                # PR용 PVC
+                - key: pvc_name
+                  expression: |
+                    body.pull_request.head.ref.contains('portal') ? '{{ .Values.modules.portal.pvc.workspace }}' : '{{ .Values.modules.system.pvc.workspace }}'
+                
+                # PR용 Dockerfile
+                - key: dockerfile_name
+                  expression: |
+                    body.pull_request.head.ref.contains('portal') ? '{{ .Values.modules.portal.build.dockerfileName }}' : '{{ .Values.modules.system.build.dockerfileName }}'
+
+      bindings:
+        - ref: {{ .Values.global.project_name }}
+      template:
+        ref: {{ .Values.global.project_name }}
+
+# ===================================================================
+# 📋 활성화된 모듈 매핑 정보
+# ===================================================================
+{{- range $moduleName, $moduleConfig := .Values.modules }}
+{{- if $moduleConfig.enabled }}
+# 🔹 {{ upper $moduleName }} 모듈:
+#   - Git Branch: {{ $moduleConfig.git.branch }}
+#   - Module Name: {{ $moduleConfig.build.moduleName }}
+#   - PVC: {{ $moduleConfig.pvc.workspace }}
+#   - Dockerfile: {{ $moduleConfig.build.dockerfileName }}
+{{- end }}
+{{- end }}
+# 
+# 웹훅 URL: http://el-{{ .Values.global.project_name }}.tekton-pipelines.svc.cluster.local:8080
+# ===================================================================

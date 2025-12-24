@@ -1,0 +1,414 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: goyoai-web-tools-http
+  namespace: traefik
+spec:
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: Host(`gdauth.goyoai.com`) && PathPrefix(`/`) 
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: authentik-server
+          namespace: authentik
+          port: 80
+
+    - kind: Rule
+      match: Host(`gdgr.goyoai.com`) && PathPrefix(`/`) 
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: goyo-grafana
+          namespace: lgtm
+          port: 80
+
+    # - kind: Rule
+    #   match: Host(`gdno.goyoai.com`) && PathPrefix(`/`) 
+    #   middlewares:
+    #     - name: redirect-http-https
+    #   services:
+    #     - kind: Service
+    #       name: goyo-nocodb
+    #       namespace: nocodb
+    #       port: 8080
+
+    - kind: Rule
+      match: Host(`gduk.goyoai.com`) && PathPrefix(`/`) 
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service          
+          name: goyo-uptime-kuma
+          namespace: uptime-kuma
+          port: 3001
+
+    # - kind: Rule
+    #   match: Host(`gdotlp.goyoai.com`) && PathPrefix(`/`) 
+    #   middlewares:
+    #     - name: redirect-http-https
+    #   services:
+    #     - kind: Service
+    #       name: goyo-opentelemetry-collector
+    #       namespace: otlp
+    #       port: 4318
+    
+    # - kind: Rule
+    #   match: Host(`gdstr.goyoai.com`) && PathPrefix(`/`) 
+    #   middlewares:
+    #     - name: redirect-http-https
+    #   services:
+    #     - kind: Service
+    #       name: goyo-sentry-nginx
+    #       namespace: sentry
+    #       port: 80
+
+    - kind: Rule
+      match: Host(`gdtek.goyoai.com`) && PathPrefix(`/`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: tekton-dashboard
+          namespace: tekton-pipelines
+          port: 9097
+
+    # - kind: Rule
+    #   match: Host(`gpbackportalscdtrg.goyoai.com`) && PathPrefix(`/`)
+    #   middlewares:
+    #     - name: redirect-http-https
+    #   services:
+    #     - kind: Service
+    #       name: el-goyoai-web-front
+    #       namespace: tekton-pipelines
+    #       port: 8080
+
+    - kind: Rule
+      match: Host(`gdwbackdev.goyoai.com`) && PathPrefix(`/`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: el-gointern-backend
+          namespace: tekton-pipelines
+          port: 8080
+
+    - kind: Rule
+      match: Host(`gdwaiserverdev.goyoai.com`) && PathPrefix(`/`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: el-goyoai-ai-server
+          namespace: tekton-pipelines
+          port: 8080  
+
+    - kind: Rule
+      match: Host(`gdwfrontdev.goyoai.com`) && PathPrefix(`/`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: el-gointern-frontend-web
+          namespace: tekton-pipelines
+          port: 8080
+
+    - kind: Rule
+      match: Host(`gdwbackportalschedulerdev.goyoai.com`) && PathPrefix(`/`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: el-goyoai-web-back-portal-scheduler
+          namespace: tekton-pipelines
+          port: 8080
+
+    # - kind: Rule
+    #   match: Host(`gdlf.goyoai.com`) && PathPrefix(`/`)
+    #   middlewares:
+    #     - name: redirect-http-https
+    #   services:
+    #     - kind: Service
+    #       name: goyo-langfuse
+    #       namespace: goyoai-web
+    #       port: 3000
+
+    - kind: Rule
+      match: Host(`gdhb.goyoai.com`) && PathPrefix(`/`) 
+      middlewares:
+        - name: redirect-http-https
+        - name: harbor-buffer
+      services:
+        - kind: Service
+          name: goyo-harbor-portal
+          namespace: harbor
+          port: 80
+
+    - kind: Rule    
+      match: Host(`gdrg.goyoai.com`) && PathPrefix(`/`) 
+      # match: PathPrefix(`/`) 
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: redis-commander
+          namespace: redis
+          port: 80
+
+    - kind: Rule    
+      match: Host(`gdmi.goyoai.com`) && PathPrefix(`/`) 
+      # match: PathPrefix(`/`) 
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: goyo-mimir-distributed-gateway
+          namespace: lgtm
+          port: 80
+
+    - kind: Rule    
+      match: Host(`gdlk.goyoai.com`) && PathPrefix(`/`) 
+      # match: PathPrefix(`/`) 
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: goyo-loki-distributed-gateway
+          namespace: lgtm
+          port: 80
+
+    # - kind: Rule    
+    #   match: Host(`gdtp.goyoai.com`) && PathPrefix(`/`) 
+    #   # match: PathPrefix(`/`) 
+    #   middlewares:
+    #     - name: redirect-http-https
+    #   services:
+    #     - kind: Service
+    #       name: goyo-tempo-distributed-distributor
+    #       namespace: lgtm
+    #       port: 4318
+          
+#ldap
+    - kind: Rule
+      match: Host(`gdlp.goyoai.com`) && PathPrefix(`/`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: goyo-ldap
+          namespace: ldap
+          port: 389
+
+    - kind: Rule
+      match: Host(`gdltb.goyoai.com`) && PathPrefix(`/`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: goyo-ldap-ltb-passwd
+          namespace: ldap
+          port: 80
+
+    - kind: Rule
+      match: Host(`gdpla.goyoai.com`) && PathPrefix(`/`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: goyo-ldap-phpldapadmin
+          namespace: ldap
+          port: 80
+
+    - kind: Rule
+      match: Host(`gdpa.goyoai.com`) && PathPrefix(`/`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: goyo-pgadmin4
+          namespace: postgresql
+          port: 80
+
+    - kind: Rule
+      match: Host(`gdargo.goyoai.com`) && PathPrefix(`/`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: goyo-argocd-server
+          namespace: argocd
+          port: 80
+
+    - kind: Rule
+      match: Host(`rmstrg.bbrick.com`) && PathPrefix(`/`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: el-rms
+          namespace: tekton-pipelines
+          port: 8080
+
+    - kind: Rule
+      match: Host(`rms.bbrick.com`) && PathPrefix(`/`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: rms
+          namespace: rms
+          port: 5000
+
+    - kind: Rule
+      match: Host(`gdrc.goyoai.com`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: goyo-rancher
+          namespace: rancher
+          port: 80
+
+    - kind: Rule
+      match: Host(`gdvt.goyoai.com`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: goyo-vault
+          namespace: vault
+          port: 8200
+
+    - kind: Rule
+      match: Host(`kdevapi.goyoai.com`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: goyoai-gointern-system
+          namespace: goyoai-web
+          port: 5000
+    
+    - kind: Rule
+      match: Host(`kdevapiportal.goyoai.com`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: goyoai-gointern-portal
+          namespace: goyoai-web
+          port: 5000
+
+    # - kind: Rule
+    #   match: Host(`gointern-api.goyoai.com`)
+    #   middlewares:
+    #     - name: redirect-http-https
+    #   services:
+    #     - kind: Service
+    #       name: dev-goyoai-backend-system
+    #       namespace: goyoai-web
+    #       port: 5000
+
+    - kind: Rule
+      match: Host(`locust.goyoai.com`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: goyo-locust
+          namespace: locust
+          port: 8089
+
+    - kind: Rule
+      match: Host(`gdbsystemstrg.goyoai.com`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: el-goyoai-backend-system
+          namespace: tekton-pipelines
+          port: 8080
+
+    - kind: Rule
+      match: Host(`gdfewebtrg.goyoai.com`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: el-goyoai-frontend-web
+          namespace: tekton-pipelines
+          port: 8080
+    
+    - kind: Rule
+      match: Host(`gdaiapitrg.goyoai.com`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: el-goyoai-ai-server
+          namespace: tekton-pipelines
+          port: 8080
+
+    - kind: Rule
+      match: Host(`gdfbackofficetrg.goyoai.com`) && PathPrefix(`/`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: el-gointern-front-backoffice
+          namespace: tekton-pipelines
+          port: 8080
+
+    - kind: Rule
+      match: Host(`gdaifybacktrg.goyoai.com`) && PathPrefix(`/`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: el-aify-backend
+          namespace: tekton-pipelines
+          port: 8080
+
+    - kind: Rule
+      match: Host(`gdpro.goyoai.com`) && PathPrefix(`/`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: prometheus-operated
+          namespace: tekton-pipelines
+          port: 9090
+
+    - kind: Rule
+      match: Host(`gdn8n.goyoai.com`) && PathPrefix(`/`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: goyo-n8n
+          namespace: n8n
+          port: 5678
+
+    - kind: Rule
+      match: Host(`gdevstockweb.goyoai.com`) && PathPrefix(`/`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: el-goyoai-stock-web
+          namespace: tekton-pipelines
+          port: 8080       
+
+    - kind: Rule
+      match: Host(`stock.bbrick.com`) && PathPrefix(`/`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: goyoai-stock-web
+          namespace: goyoai-web
+          port: 5001

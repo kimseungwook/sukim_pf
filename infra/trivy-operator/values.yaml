@@ -1,0 +1,198 @@
+# goyo_dev/trivy-operator/values.yaml
+# Trivy Operator - Enhanced Configuration
+
+# ===== 스캔 대상 네임스페이스 =====
+targetNamespaces: "goyoai-web,argocd,kyverno,falco,trivy,vault,authentik"
+excludeNamespaces: "kube-system,kube-public,kube-node-lease,prometheus,cert-manager,monitoring,logging,harbor,tekton-pipelines,ingress-nginx,default,rms,keda"
+
+# ===== 이미지 설정 =====
+image:
+  registry: "mirror.gcr.io"
+  repository: "aquasec/trivy-operator"
+  pullPolicy: IfNotPresent
+
+# ===== Operator 설정 =====
+operator:
+  replicas: 1
+  scanJobTimeout: 15m  # 10m → 15m (OOM 방지)
+  scanJobsConcurrentLimit: 1  # 동시 스캔 1개만!
+  scanJobsRetryDelay: 30s
+  
+  # [변경] 모든 스캐너 활성화
+  vulnerabilityScannerEnabled: true
+  sbomGenerationEnabled: false  # SBOM은 선택 (무거움)
+  configAuditScannerEnabled: true  # ← 활성화!
+  rbacAssessmentScannerEnabled: true  # ← 활성화!
+  infraAssessmentScannerEnabled: false  # Node Scanner 필요 (Virtual Node에서 작동 안 함)
+  clusterComplianceEnabled: false  # 선택
+  exposedSecretScannerEnabled: true  # ← 활성화!
+
+  # PolicyReport 생성 활성화
+  generatePolicyReports: true  # ← 이것!
+  
+  # Metrics 설정
+  metricsFindingsEnabled: true
+  metricsVulnIdEnabled: false
+  metricsExposedSecretInfo: false
+  metricsConfigAuditInfo: true  # ← 활성화!
+  metricsRbacAssessmentInfo: false
+  metricsInfraAssessmentInfo: false
+  metricsImageInfo: false
+  metricsClusterComplianceInfo: false
+  
+  vulnerabilityScannerScanOnlyCurrentRevisions: true
+  scannerReportTTL: "24h"
+  
+  privateRegistryScanSecretsNames:
+    "gdhb.goyoai.com": "harbor-registry-secret"
+  
+  accessGlobalSecretsAndServiceAccount: true
+
+# ===== Trivy Operator 세부 설정 =====
+trivyOperator:
+  vulnerabilityReportsPlugin: "Trivy"
+  scanJobCompressLogs: true
+  scanJobsInSameNamespace: false
+  scanJobAutomountServiceAccountToken: true
+  
+  # OpenTelemetry/Istio 주입 방지
+  scanJobAnnotations: "sidecar.opentelemetry.io/inject=false,instrumentation.opentelemetry.io/inject-java=false,instrumentation.opentelemetry.io/inject-python=false,instrumentation.opentelemetry.io/inject-nodejs=false"
+  scanJobPodTemplateLabels: "sidecar.istio.io/inject=false,linkerd.io/inject=disabled"
+  
+  skipInitContainers: false
+  
+  scanJobPodTemplateContainerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    privileged: false
+    readOnlyRootFilesystem: false  # Trivy 캐시 쓰기 위해 false
+    runAsNonRoot: true
+    runAsUser: 65534
+    seccompProfile:
+      type: RuntimeDefault
+  
+  reportRecordFailedChecksOnly: true
+  additionalReportLabels: ""
+  
+  # [핵심!] 사이드카 이미지 제외 - comma-separated string!
+  excludeImages: "gdhb.goyoai.com/common/promtail:*,*/promtail:*,grafana/promtail:*,gdhb.goyoai.com/common/vault:*,*/vault:*,hashicorp/vault:*,curlimages/curl:8.4.0"
+
+# ===== Trivy 스캐너 설정 =====
+trivy:
+  image:
+    registry: mirror.gcr.io
+    repository: aquasec/trivy
+    tag: 0.66.0
+    pullPolicy: IfNotPresent
+  
+  mode: Standalone
+  severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+  slow: true
+  ignoreUnfixed: true
+  timeout: "10m0s"
+  offlineScan: false
+  command: image
+  imageScanCacheDir: "/tmp/trivy/.cache"
+  
+  # [변경] 메모리 및 CPU 증가
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+      ephemeral-storage: "2Gi"
+    limits:
+      cpu: 1000m
+      memory: 2Gi  # ← OOMKilled 방지!
+      ephemeral-storage: "4Gi"
+  
+  dbRegistry: "mirror.gcr.io"
+  dbRepository: "aquasec/trivy-db"
+  javaDbRegistry: "mirror.gcr.io"
+  javaDbRepository: "aquasec/trivy-java-db"
+  
+  useBuiltinRegoPolicies: "false"
+  useEmbeddedRegoPolicies: "true"
+  debug: false
+
+# ===== Compliance 설정 =====
+compliance:
+  enabled: true
+  failEntriesLimit: 10
+  reportType: summary
+  cron: "0 */6 * * *"
+  specs: []
+
+# ===== RBAC =====
+rbac:
+  create: true
+
+serviceAccount:
+  create: true
+  name: ""
+
+# ===== Security Context =====
+podSecurityContext: {}
+
+securityContext:
+  privileged: false
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# ===== Operator 리소스 =====
+resources:
+  limits:
+    cpu: 400m
+    memory: 1Gi
+  requests:
+    cpu: 200m
+    memory: 512Mi
+
+# ===== Node Collector =====
+nodeCollector:
+  useNodeSelector: false
+  volumeMounts: []
+  volumes: []
+
+# ===== Policies Bundle =====
+policiesBundle:
+  registry: mirror.gcr.io
+  repository: aquasec/trivy-checks
+  tag: 1
+
+# ===== Service =====
+service:
+  metricsPort: 80
+
+# ===== [수정됨] Monitoring 설정 (핵심) =====
+serviceMonitor:
+  enabled: true # false -> true 변경
+  # Prometheus Operator가 감지할 네임스페이스
+  namespace: "prometheus" 
+  interval: "30s"
+  # Goyo Prometheus Stack이 이 ServiceMonitor를 인식하게 하는 라벨
+  labels:
+    release: goyo-prometheus-stack
+
+automountServiceAccountToken: true
+
+# ===== Volumes =====
+volumeMounts:
+  - mountPath: /tmp
+    name: cache-policies
+    readOnly: false
+  - mountPath: /var/trivy-cache
+    name: trivy-cache
+    readOnly: false
+
+volumes:
+  - name: cache-policies
+    emptyDir:
+      sizeLimit: 1Gi
+  - name: trivy-cache
+    emptyDir:
+      sizeLimit: 2Gi

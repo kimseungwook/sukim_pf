@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: vault-test
+  name: vault-test
+  # namespace: goyoai-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vault-test
+  template:
+    metadata:
+      annotations:
+        vault.hashicorp.com/agent-init-first: "true"
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: gointern_dev
+        vault.hashicorp.com/agent-inject-secret-config.json: gointern_dev
+        vault.hashicorp.com/agent-inject-template-config.json: |
+          {{- with secret "gointern-dev/data/gointern-dev" -}}
+          {"username":"{{ .Data.data.username }}","password":"{{ .Data.data.password }},"service":"{{ .Data.data.service }}"}
+          {{- end }}
+        vault.hashicorp.com/secret-volume-path-config.json: /gointern_dev
+      labels:
+        app: vault-test
+    spec:
+      containers:
+      - image: nginx
+        name: vault-test

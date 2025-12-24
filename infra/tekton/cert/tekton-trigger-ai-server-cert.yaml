@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: tekton-trigger-ai-server-tls
+  namespace: tekton-pipelines
+spec:
+  secretName: tekton-trigger-ai-server-tls
+  issuerRef:
+    name: tekton-dev
+    kind: ClusterIssuer
+  dnsNames:
+    - gdwaiserverdev.goyoai.com

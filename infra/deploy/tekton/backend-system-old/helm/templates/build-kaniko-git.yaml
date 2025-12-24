@@ -1,0 +1,117 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: {{ .Values.project_name }}-image-build
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/version: "0.6"
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.17.0"
+    tekton.dev/categories: Image Build
+    tekton.dev/tags: image-build
+    tekton.dev/displayName: "Build and upload container image using Kaniko"
+    tekton.dev/platforms: "linux/amd64,linux/arm64,linux/ppc64le"
+spec:
+  description: >-
+    This Task builds a Docker image with Kaniko and pushes it to a registry.
+    The image name and digest are stored as results.
+  params:
+    - name: container-registry-url
+      type: string
+    - name: container-registry-cache-url
+      type: string
+    - name: timestamp
+      type: string
+    - name: project-name
+      type: string
+      default: {{ .Values.project_name }}
+    - name: git-short-sha
+      type: string
+    - name: EXTRA_ARGS
+      type: array
+      default: []
+    - name: module-name
+      type: string
+      description: "The module to build"
+    - name: dockerfile-name
+      type: string
+
+  workspaces:
+    - name: {{ .Values.project_name }}
+      description: Holds the context and Dockerfile
+    
+  steps:
+    - name: list-files
+      image: {{ .Values.common_alpine_url }}
+      script: |
+        #!/bin/sh
+        WORKSPACE_PATH=$(workspaces.{{ .Values.project_name }}.path)
+        MODULE_DIR=$WORKSPACE_PATH/$(params.module-name)
+        PROJECT_DIR=$MODULE_DIR/source
+        echo "Listing files in $PROJECT_DIR :"
+        ls -al $PROJECT_DIR
+
+
+    - name: build-and-push
+      image: gcr.io/kaniko-project/executor:v1.23.2
+      args:
+        - --context=$(workspaces.{{ .Values.project_name }}.path)/$(params.module-name)/source
+        - --dockerfile=$(workspaces.{{ .Values.project_name }}.path)/$(params.module-name)/source/$(params.dockerfile-name)
+        - --destination=$(params.container-registry-url)/$(params.module-name):$(params.git-short-sha)-$(params.timestamp)
+        - --force
+        - --skip-tls-verify
+        - --skip-unused-stages
+        - --use-new-run
+        - --cache=true
+        - --cache-ttl=168h
+        - --cache-repo=$(params.container-registry-cache-url)/$(params.module-name)
+        - --cache-copy-layers
+        - --snapshot-mode=redo
+        - --compressed-caching=false
+        - --ignore-var-run
+        - --cleanup
+        - --cache-dir=/cache    # 캐시 디렉토리 명시적 지정
+        - --verbosity=debug
+      env:
+        - name: GRADLE_USER_HOME
+          value: "/workspace/gradle-home/$(params.module-name)"
+        - name: GRADLE_OPTS
+          value: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.workers.max=2 -Dorg.gradle.caching=true -Dorg.gradle.vfs.watch=false"
+      volumeMounts:
+        - name: docker-config
+          mountPath: /kaniko/.docker
+        - name: gradle-workspace
+          mountPath: /workspace/gradle-home
+        - name: kaniko-cache
+          mountPath: /cache
+      securityContext:
+        runAsUser: 0
+
+    - name: debug-cache
+      image: {{ .Values.common_alpine_url }}
+      script: |
+        #!/bin/sh
+        echo "Checking cache status..."
+        # 캐시 디렉토리 내용 확인
+        ls -la /cache || echo "Cache directory not found"
+        # 네트워크 연결 확인
+        ping -c 3 $(echo "$(params.container-registry-cache-url)" | sed 's|https://||' | sed 's|http://||' | sed 's|/.*||') || echo "Cannot reach cache registry"
+      volumeMounts:
+        - name: kaniko-cache
+          mountPath: /cache
+    
+  volumes:
+    - name: docker-config
+      secret:
+        secretName: {{ .Values.container_registry_secretName }}
+        items:
+          - key: .dockerconfigjson
+            path: config.json
+    # - name: gradle-cache-dir
+    #   persistentVolumeClaim:
+    #     claimName: {{ .Values.gradle_cache_pvc_name }}
+    - name: gradle-workspace
+      emptyDir: {}
+    - name: kaniko-cache
+      emptyDir: 
+        sizeLimit: 10Gi

@@ -1,0 +1,11 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: goyoai-web-front-traefik-pdb
+  namespace: goyoai-web
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:      
+      app.kubernetes.io/instance: front-traefik-goyoai-web
+      

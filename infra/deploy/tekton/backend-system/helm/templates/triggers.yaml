@@ -1,0 +1,173 @@
+# 모듈화된 동적 트리거 템플릿 (aify 제거)
+# templates/triggers.yaml
+# ===================================================================
+
+# TriggerBinding - 모든 모듈에서 공통 사용
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: {{ .Values.global.project_name }}
+  namespace: tekton-pipelines
+  labels:
+    {{- include "backend-system.labels" . | nindent 4 }}
+    type: trigger-binding
+  annotations:
+    description: "GitHub 웹훅 이벤트를 Tekton 파라미터로 바인딩"
+spec:
+  params:
+    - name: gitrevision
+      value: $(extensions.branch_name)
+      description: "Git 브랜치명"
+    - name: gitrepositoryurl
+      value: $(body.repository.clone_url)
+      description: "Git 저장소 URL"
+    - name: git-repo-name
+      value: $(body.repository.name)
+      description: "Git 저장소 이름"
+    - name: git-sha
+      value: $(extensions.sha)
+      description: "Git 커밋 SHA"
+    - name: git-short-sha
+      value: $(extensions.short_sha)
+      description: "Git 짧은 SHA"
+    - name: module-name
+      value: $(extensions.module_name)
+      description: "빌드할 모듈 이름"
+    - name: dockerfile-name
+      value: $(extensions.dockerfile_name)
+      description: "사용할 Dockerfile 이름"
+    - name: pvc-name
+      value: $(extensions.pvc_name)
+      description: "사용할 PVC 이름"
+
+# TriggerTemplate - 동적 파이프라인 실행
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: {{ .Values.global.project_name }}
+  namespace: tekton-pipelines
+  labels:
+    {{- include "backend-system.labels" . | nindent 4 }}
+    type: trigger-template
+  annotations:
+    description: "파이프라인 실행을 위한 동적 템플릿"
+spec:
+  params:
+    - name: gitrevision
+      description: "Git 브랜치명"
+    - name: gitrepositoryurl
+      description: "Git 저장소 URL"
+    - name: git-repo-name
+      description: "Git 저장소 이름"
+    - name: git-sha
+      description: "Git 커밋 SHA"
+    - name: git-short-sha
+      description: "Git 짧은 SHA"
+    - name: module-name
+      description: "빌드할 모듈 이름"
+    - name: dockerfile-name
+      description: "사용할 Dockerfile 이름"
+    - name: pvc-name
+      description: "사용할 PVC 이름"
+  
+  resourcetemplates:
+    # 동적 PipelineRun 생성
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: $(tt.params.git-repo-name)-$(tt.params.gitrevision)-
+        namespace: tekton-pipelines
+        labels:
+          {{- include "backend-system.labels" . | nindent 10 }}
+          pipeline-type: "ci-cd"
+          git-branch: $(tt.params.gitrevision)
+          module: $(tt.params.module-name)
+        annotations:
+          triggers.tekton.dev/git-sha: $(tt.params.git-sha)
+          triggers.tekton.dev/git-branch: $(tt.params.gitrevision)
+          triggers.tekton.dev/module: $(tt.params.module-name)
+      spec:
+        # 모듈명 기반으로 동적 파이프라인 선택
+        pipelineRef:
+          name: |
+            {{- range $moduleName, $moduleConfig := .Values.modules }}
+            {{- if $moduleConfig.enabled }}
+            {{- if eq $moduleName "system" }}
+            goyoai-gointern-system
+            {{- else if eq $moduleName "portal" }}
+            goyoai-gointern-portal
+            {{- end }}
+            {{- end }}
+            {{- end }}
+        
+        # 파라미터 전달
+        params:
+          - name: giturl
+            value: $(tt.params.gitrepositoryurl)
+          - name: container-registry-url
+            value: {{ .Values.global.registry.url }}
+          - name: container-registry-cache-url
+            value: {{ .Values.global.registry.cache_url }}
+          - name: revision
+            value: $(tt.params.gitrevision)
+          - name: manifest-file-name
+            value: {{ .Values.global.kustomize.manifestFileName }}
+          - name: commit-message
+            value: {{ .Values.global.kustomize.commitMessage }}
+          - name: project-name
+            value: {{ .Values.global.project_name }}
+          - name: git-short-sha
+            value: $(tt.params.git-short-sha)
+          - name: module-name
+            value: $(tt.params.module-name)
+          - name: dockerfile-name
+            value: $(tt.params.dockerfile-name)
+        
+        # 워크스페이스 설정
+        workspaces:
+          - name: {{ .Values.global.project_name }}
+            persistentVolumeClaim:
+              claimName: $(tt.params.pvc-name)
+        
+        # 스케줄링 및 리소스 설정
+        podTemplate:
+          nodeSelector:
+            {{- toYaml .Values.pipeline.nodeSelector | nindent 12 }}
+          tolerations:
+            {{- toYaml .Values.pipeline.tolerations | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.security.podSecurityContext | nindent 12 }}
+        
+        # 타임아웃 설정
+        timeouts:
+          pipeline: {{ .Values.pipeline.timeouts.pipeline }}
+          tasks: {{ .Values.pipeline.timeouts.tasks }}
+          finally: {{ .Values.pipeline.timeouts.finally }}
+        
+        # 서비스 어카운트
+        serviceAccountName: {{ .Values.serviceAccounts.git }}
+
+# ===================================================================
+# 📊 트리거 구성 요약
+# ===================================================================
+# 
+# 🔗 TriggerBinding: {{ .Values.global.project_name }}
+# - GitHub 웹훅 이벤트를 Tekton 파라미터로 변환
+# - 동적 모듈 감지 및 매핑 지원
+# 
+# 📋 TriggerTemplate: {{ .Values.global.project_name }}
+# - PipelineRun 동적 생성
+# - 모듈별 파이프라인 자동 선택
+# - PVC, 스케줄링, 보안 설정 적용
+# 
+# 🎯 지원 모듈:
+{{- range $moduleName, $moduleConfig := .Values.modules }}
+{{- if $moduleConfig.enabled }}
+# - {{ title $moduleName }}: {{ $moduleConfig.git.branch }} → goyoai-gointern-{{ $moduleName }}
+{{- end }}
+{{- end }}
+# 
+# EventListener와 연동하여 완전한 CI/CD 트리거 체인 구성
+# ===================================================================

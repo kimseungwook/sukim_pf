@@ -1,0 +1,94 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: hyper-report-frontend-web
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: giturl
+      type: string
+    - name: ocir-url
+      type: string
+    - name: ocir-cache-url
+      type: string
+    - name: revision
+      type: string
+    - name: manifest-file-name
+      type: string
+      description: "Path to the Kubernetes manifest file in the Git repository."
+    - name: commit-message
+      type: string
+      default: "Update Kubernetes manifest"
+    - name: project-name
+      type: string
+    - name: git-short-sha
+      type: string
+      
+  workspaces:
+    - name: hyper-report-web
+
+  tasks:
+    - name: generate-timestamp
+      taskRef:
+        name: generate-timestamp
+      params:
+        - name: project-name
+          value: $(params.project-name)
+
+    - name: clone-repository
+      taskRef:
+        name: hyper-report-frontend-web-git-clone
+      params:
+        - name: giturl
+          value: $(params.giturl)
+        - name: revision
+          value: $(params.revision)
+        - name: project-name
+          value: $(params.project-name)
+      runAfter: ["generate-timestamp"]
+      workspaces:
+        - name: hyper-report-web
+          workspace: hyper-report-web
+
+    - name: build-container-image
+      taskRef:
+        name: hyper-report-frontend-web-image-build
+      params:
+        - name: ocir-url
+          value: $(params.ocir-url)
+        - name: ocir-cache-url
+          value: $(params.ocir-cache-url)
+        - name: project-name
+          value: $(params.project-name)
+        - name: timestamp
+          value: $(tasks.generate-timestamp.results.timestamp)
+        - name: git-short-sha
+          value: $(params.git-short-sha)        
+      runAfter: ["clone-repository"]
+      workspaces:
+        - name: hyper-report-web
+          workspace: hyper-report-web
+
+    - name: manifest-git-push
+      taskRef:
+        name: hyper-report-frontend-web-manifest
+      params:
+        - name: manifest-file-name
+          value: $(params.manifest-file-name)
+        - name: ocir-url
+          value: $(params.ocir-url)
+        - name: commit-message
+          value: $(params.commit-message)
+        - name: revision
+          value: $(params.revision)
+        - name: project-name
+          value: $(params.project-name)
+        - name: timestamp
+          value: $(tasks.generate-timestamp.results.timestamp)
+        - name: git-short-sha
+          value: $(params.git-short-sha)
+        
+      runAfter: ["build-container-image"]
+      workspaces:
+        - name: hyper-report-web
+          workspace: hyper-report-web

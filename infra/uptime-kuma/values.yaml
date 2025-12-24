@@ -1,0 +1,53 @@
+image:
+  repository: docker.io/louislam/uptime-kuma
+  tag: "1.23.13-debian"
+
+service:
+  type: ClusterIP
+  port: 3001
+
+ingress:
+  enabled: false  # 필요시 true로 변경 및 추가 설정 필요
+
+resources: {}  # 필요시 리소스 제한 설정 추가
+
+volume:
+  enabled: true
+  accessMode: ReadWriteOnce
+  size: 4Gi
+  # storageClassName: # OKE 환경에 맞는 storageClassName 설정 필요
+
+livenessProbe:
+  enabled: true
+  failureThreshold: 3
+  initialDelaySeconds: 180
+  periodSeconds: 10
+  successThreshold: 1
+  timeoutSeconds: 2
+  exec:
+    command:
+      - "extra/healthcheck"
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 1
+  failureThreshold: 3
+  successThreshold: 1
+  httpGet:
+    path: /
+    port: 3001
+    scheme: HTTP
+
+podEnv:
+  - name: "UPTIME_KUMA_PORT"
+    value: "3001"
+
+nodeSelector:
+  goyo-svc: monitoring
+tolerations:
+  - key: "goyo-svc"
+    operator: "Equal"
+    value: "monitoring"
+    effect: "NoSchedule"

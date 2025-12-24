@@ -1,0 +1,80 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: {{ .Values.project_name }}
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: gitrevision
+      description: The git revision
+      default: {{ .Values.gitRevision }}
+    - name: gitrepositoryurl
+      description: The git repository URL
+      default: {{ .Values.gitUrl }}
+    - name: git-sha
+    - name: git-short-sha
+    - name: deploy-env
+    - name: git-repo-name
+    - name: module-name
+      description: The module to build
+    - name: dockerfile-name
+      description: Name of the Dockerfile to use
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: $(tt.params.module-name)-
+        namespace: tekton-pipelines
+      spec:
+        pipelineRef:
+          name: $(tt.params.module-name)
+        params:
+          - name: giturl
+            value: "$(tt.params.gitrepositoryurl)"
+          - name: container-registry-url
+            value: "{{ .Values.container_registry_url }}"
+          - name: container-registry-cache-url
+            value: "{{ .Values.container_registry_cache_url }}"
+          - name: manifest-file-name
+            value: "{{ .Values.manifestFileName }}"
+          - name: commit-message
+            value: "Update $(tt.params.git-repo-name):$(tt.params.gitrevision) git hash: $(tt.params.git-short-sha) "
+          - name: project-name
+            value: "$(tt.params.git-repo-name)"
+          - name: revision
+            value: "$(tt.params.gitrevision)"
+          - name: git-short-sha
+            value: "$(tt.params.git-short-sha)"
+          - name: module-name
+            value: "$(tt.params.module-name)"
+          - name: dockerfile-name
+            value: "$(tt.params.dockerfile-name)"
+        workspaces:
+          - name: {{ .Values.project_name }}
+            emptyDir: {}  # Job 방식에서는 실제 workspace 불필요
+          - name: dockerconfig
+            secret:
+              secretName: {{ .Values.container_registry_secretName}}
+        serviceAccountName: tekton-ci-token
+        
+        # ✨ 중요: 기본 podTemplate - 일반 Task용 (Virtual Node 제외!)
+        podTemplate:
+          # Virtual Node가 아닌 일반 노드에서만 실행
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  # ❌ Virtual Node 제외
+                  - key: workload-type
+                    operator: DoesNotExist
+                  # ✅ 일반 노드 선택
+                  - key: {{ .Values.trigger_node_selector_key }}
+                    operator: In
+                    values:
+                    - {{ .Values.trigger_node_selector_value }}
+          tolerations:
+          - key: {{ .Values.trigger_tolerations_key }}
+            operator: {{ .Values.trigger_tolerations_operator }}
+            value: {{ .Values.trigger_tolerations_value }}
+            effect: {{ .Values.trigger_tolerations_effect }}

@@ -1,0 +1,79 @@
+# harbor-triggertemplate.yaml
+
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: {{ .Values.project_name | default .Chart.Name }}-manifest-template
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: module-name
+      description: "Module name from Harbor webhook"
+    - name: image-tag
+      description: "Image tag from Harbor webhook"
+    - name: container-registry-url
+      description: "Container registry URL"
+    - name: commit-message
+      description: "Git commit message"
+      default: "Update manifest from Harbor push"
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: TaskRun
+      metadata:
+        # [수정] "jib" 제거
+        generateName: {{ .Values.project_name | default .Chart.Name }}-manifest-run-
+        namespace: tekton-pipelines
+      spec:
+        serviceAccountName: {{ .Values.secret_token}}
+        taskRef:
+          # [수정] Task 이름과 일치
+          name: {{ .Values.project_name | default .Chart.Name }}-manifest-update
+        params:
+          - name: container-registry-url
+            value: $(tt.params.container-registry-url)
+          - name: commit-message
+            value: $(tt.params.commit-message)
+          - name: image-tag
+            value: $(tt.params.image-tag)
+          - name: module-name
+            value: $(tt.params.module-name)
+          
+          - name: kustomize-giturl
+            value: "{{ .Values.kustomize_git_url }}"
+          - name: project-name
+            value: "{{ .Values.project_name | default .Chart.Name }}"
+          
+          # [추가] values.yaml의 새 변수들을 TaskRun에 전달
+          - name: kustomize-git-branch
+            value: "{{ .Values.kustomize_git_branch }}"
+          - name: kustomize-overlay-path
+            value: "{{ .Values.kustomize_overlay_path }}"
+            
+        workspaces:
+          - name: {{ .Values.project_name | default .Chart.Name }}
+            persistentVolumeClaim:
+              # [수정] values.yaml과 일치
+              claimName: {{ .Values.workspace_pvc_name }}
+        podTemplate:
+          {{- if .Values.trigger_node_selector_key }}
+          nodeSelector:
+            {{ .Values.trigger_node_selector_key }}: {{ .Values.trigger_node_selector_value }}
+          {{- end }}
+          {{- if .Values.trigger_node_selector_key }}
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: {{ .Values.trigger_node_selector_key }}
+                        operator: {{ .Values.trigger_node_affinity_operator }}
+                        values:
+                          - {{ .Values.trigger_node_selector_value }}
+          {{- end }}
+          {{- if .Values.trigger_tolerations_key }}
+          tolerations:
+            - key: {{ .Values.trigger_tolerations_key }}
+              operator: {{ .Values.trigger_tolerations_operator }}
+              value: {{ .Values.trigger_tolerations_value }}
+              effect: {{ .Values.trigger_tolerations_effect }}
+          {{- end }}

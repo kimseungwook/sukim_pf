@@ -1,23 +1,23 @@
 commonSettings: &commonSettings
   nodeSelector:
-    goyo-svc: monitoring
-  tolerations:
-    - key: "goyo-svc"
-      operator: "Equal"
-      value: "monitoring"
-      effect: "NoSchedule"
+    service: monitoring
+  tolerations: []
 
-enterprise:
-  enabled: false
-  legacyLabels: false
+global:
+  dnsService: kube-dns
+  dnsNamespace: kube-system
+  clusterDomain: cluster.local.
+  extraEnvFrom:
+    - secretRef:
+        name: objstore-secret
 
 minio:
   enabled: false
 
-# Memcached 이미지 - repository에 full path 지정
+# Memcached image
 memcached:
   image:
-    repository: docker.io/memcached  # registry 포함
+    repository: memcached
     tag: 1.6.39-alpine
     pullPolicy: IfNotPresent
   podSecurityContext: {}
@@ -28,12 +28,12 @@ memcached:
       drop: [ALL]
     allowPrivilegeEscalation: false
 
-# Memcached Exporter 이미지 - repository에 full path 지정
+# Memcached Exporter image
 memcachedExporter:
   enabled: true
   image:
-    repository: docker.io/prom/memcached-exporter  # registry 포함
-    tag: v0.15.3
+    repository: prom/memcached-exporter
+    tag: v0.15.4
     pullPolicy: IfNotPresent
   resources:
     requests:
@@ -48,11 +48,11 @@ memcachedExporter:
     allowPrivilegeEscalation: false
   extraArgs: {}
 
-# Kafka
+# Kafka - for ingest storage architecture
 kafka:
   enabled: true
   image:
-    # registry: docker.io
+    registry: docker.io
     repository: docker.io/apache/kafka-native
     tag: 4.1.0
     pullPolicy: IfNotPresent
@@ -62,14 +62,13 @@ kafka:
     type: ClusterIP
   persistence:
     enabled: true
-    size: 100Gi
+    size: 10Gi
     storageClassName: ""
   resources:
     requests:
-      cpu: 2
-      memory: 4Gi
-    limits:
-      memory: 8Gi
+      cpu: 1
+      memory: 1Gi
+    limits: {}
   <<: *commonSettings
   securityContext:
     fsGroup: 1001
@@ -87,12 +86,11 @@ kafka:
     maxUnavailable: 1
   terminationGracePeriodSeconds: 30
 
-# Rollout Operator
+# Rollout Operator - required for zone-aware replication
 rollout_operator:
   enabled: true
   image:
-    registry: docker.io
-    repository: grafana/rollout-operator
+    repository: docker.io/grafana/rollout-operator
     tag: v0.32.0
     pullPolicy: IfNotPresent
   podSecurityContext:
@@ -108,194 +106,170 @@ rollout_operator:
       drop: [ALL]
     allowPrivilegeEscalation: false
 
-# Mimir 설정
+# Mimir configuration using environment variables for secrets
 mimir:
   structuredConfig:
-    ingest_storage:
-      enabled: true
-      kafka:
-        address: goyo-mimir-distributed-kafka.monitoring.svc.cluster.local:9092
-        topic: mimir-ingest
-        auto_create_topic_enabled: true
-        auto_create_topic_default_partitions: 100
-    
-    ingester:
-      push_grpc_method_enabled: false
-      ring:
-        final_sleep: 0s
-        num_tokens: 512
-        tokens_file_path: /data/tokens
-        unregister_on_shutdown: false
-        heartbeat_period: 2m
-        heartbeat_timeout: 10m
-        zone_awareness_enabled: true
-    
-    distributor:
-      remote_timeout: 5s
-      ring:
-        heartbeat_period: 1m
-        heartbeat_timeout: 4m
-    
-    limits:
-      max_global_series_per_user: 2000000
-      ingestion_rate: 400000
-      ingestion_burst_size: 8000000
-      max_global_metadata_per_user: 0
-      max_global_metadata_per_metric: 0
-    
     common:
       storage:
         backend: s3
         s3:
-          bucket_name: mimir-bucket-prd
+          bucket_name: mimir-bucket-sukim
           endpoint: cn7ipyag4bte.compat.objectstorage.ap-seoul-1.oraclecloud.com
-          access_key_id: 4b8eb9627f942003c8b3d6b66fc6f6caefcb1b9a
-          secret_access_key: "+hULmOEAxJI7sgAHZoGBow53K3EQsGbc52thwJKP7X8="
+          access_key_id: "${AWS_ACCESS_KEY_ID}"
+          secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
           region: ap-seoul-1
           http:
             insecure_skip_verify: true
-    
+
+    blocks_storage:
+      backend: s3
+      storage_prefix: blocks
+      s3:
+        bucket_name: mimir-bucket-sukim
+        endpoint: cn7ipyag4bte.compat.objectstorage.ap-seoul-1.oraclecloud.com
+        access_key_id: "${AWS_ACCESS_KEY_ID}"
+        secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
+        region: ap-seoul-1
+        http:
+          insecure_skip_verify: true
+
     ruler_storage:
       backend: s3
+      storage_prefix: ruler
       s3:
-        bucket_name: mimir-ruler-bucket-prd
+        bucket_name: mimir-bucket-sukim
         endpoint: cn7ipyag4bte.compat.objectstorage.ap-seoul-1.oraclecloud.com
-        access_key_id: 4b8eb9627f942003c8b3d6b66fc6f6caefcb1b9a
-        secret_access_key: "+hULmOEAxJI7sgAHZoGBow53K3EQsGbc52thwJKP7X8="
+        access_key_id: "${AWS_ACCESS_KEY_ID}"
+        secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
         region: ap-seoul-1
         http:
           insecure_skip_verify: true
 
     alertmanager_storage:
       backend: s3
+      storage_prefix: alertmanager
       s3:
-        bucket_name: mimir-alertmanager-bucket-prd
+        bucket_name: mimir-bucket-sukim
         endpoint: cn7ipyag4bte.compat.objectstorage.ap-seoul-1.oraclecloud.com
-        access_key_id: 4b8eb9627f942003c8b3d6b66fc6f6caefcb1b9a
-        secret_access_key: "+hULmOEAxJI7sgAHZoGBow53K3EQsGbc52thwJKP7X8="
+        access_key_id: "${AWS_ACCESS_KEY_ID}"
+        secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
         region: ap-seoul-1
         http:
           insecure_skip_verify: true
 
-    blocks_storage:
-      backend: s3
-      s3:
-        bucket_name: mimir-blocks-bucket-prd
-        endpoint: cn7ipyag4bte.compat.objectstorage.ap-seoul-1.oraclecloud.com
-        access_key_id: 4b8eb9627f942003c8b3d6b66fc6f6caefcb1b9a
-        secret_access_key: "+hULmOEAxJI7sgAHZoGBow53K3EQsGbc52thwJKP7X8="
-        region: ap-seoul-1
-        http:
-          insecure_skip_verify: true
+    limits:
+      max_global_series_per_user: 500000
+      ingestion_rate: 100000
+      ingestion_burst_size: 2000000
+      max_total_query_length: 12000h
+      max_query_parallelism: 240
+      max_cache_freshness: 10m
 
-# 컴포넌트
-admin_api:
-  replicas: 1
-  <<: *commonSettings
-
+# Alertmanager
 alertmanager:
+  enabled: true
   replicas: 1
   <<: *commonSettings
   zoneAwareReplication:
     enabled: false
-
-compactor:
-  replicas: 1
-  <<: *commonSettings
-
-distributor:
-  replicas: 2
-  <<: *commonSettings
-
-ingester:
-  replicas: 3
-  <<: *commonSettings
-  zoneAwareReplication:
+  persistentVolume:
     enabled: true
-    migration:
-      enabled: false
-    zones:
-      - name: zone-a
-        <<: *commonSettings
-      - name: zone-b
-        <<: *commonSettings
-      - name: zone-c
-        <<: *commonSettings
+    size: 1Gi
 
-querier:
-  replicas: 2
-  <<: *commonSettings
-
-query_frontend:
+# Compactor
+compactor:
+  enabled: true
   replicas: 1
   <<: *commonSettings
+  persistentVolume:
+    enabled: true
+    size: 2Gi
 
+# Distributor
+distributor:
+  enabled: true
+  replicas: 1
+  <<: *commonSettings
+  extraArgs:
+    config.expand-env: "true"
+
+# Ingester - zone-aware replication disabled for single-node
+ingester:
+  enabled: true
+  replicas: 1
+  <<: *commonSettings
+  extraArgs:
+    config.expand-env: "true"
+  zoneAwareReplication:
+    enabled: false
+  persistentVolume:
+    enabled: true
+    size: 2Gi
+
+# Querier
+querier:
+  enabled: true
+  replicas: 1
+  <<: *commonSettings
+  extraArgs:
+    config.expand-env: "true"
+
+# Query Frontend
+query_frontend:
+  enabled: true
+  replicas: 1
+  <<: *commonSettings
+  extraArgs:
+    config.expand-env: "true"
+
+# Query Scheduler
 query_scheduler:
   enabled: true
-  replicas: 2
-  <<: *commonSettings
-
-ruler:
   replicas: 1
   <<: *commonSettings
 
-store_gateway:
-  replicas: 3
+# Ruler
+ruler:
+  enabled: true
+  replicas: 1
   <<: *commonSettings
-  zoneAwareReplication:
-    enabled: true
-    migration:
-      enabled: false
-    zones:
-      - name: zone-a
-        <<: *commonSettings
-      - name: zone-b
-        <<: *commonSettings
-      - name: zone-c
-        <<: *commonSettings
+  extraArgs:
+    config.expand-env: "true"
 
+# Store Gateway - zone-aware replication disabled for single-node
+store_gateway:
+  enabled: true
+  replicas: 1
+  <<: *commonSettings
+  extraArgs:
+    config.expand-env: "true"
+  zoneAwareReplication:
+    enabled: false
+  persistentVolume:
+    enabled: true
+    size: 2Gi
+
+# Overrides Exporter
 overrides_exporter:
   enabled: true
   replicas: 1
   <<: *commonSettings
 
+# Gateway (replaces nginx)
 gateway:
-  enabledNonEnterprise: true
+  enabled: true
   replicas: 1
   <<: *commonSettings
 
-nginx:
+# Cache settings - disabled for single-node portfolio environment
+chunks-cache:
   enabled: false
 
-# Cache 설정
-chunks-cache:
-  enabled: true
-  replicas: 1
-  allocatedMemory: 8192
-  maxItemMemory: 64
-  connectionLimit: 16384
-  <<: *commonSettings
-
 index-cache:
-  enabled: true
-  replicas: 1
-  allocatedMemory: 2048
-  maxItemMemory: 16
-  connectionLimit: 16384
-  <<: *commonSettings
+  enabled: false
 
 metadata-cache:
-  enabled: true
-  replicas: 1
-  allocatedMemory: 512
-  maxItemMemory: 16
-  connectionLimit: 16384
-  <<: *commonSettings
+  enabled: false
 
 results-cache:
-  enabled: true
-  replicas: 1
-  allocatedMemory: 1024
-  maxItemMemory: 16
-  connectionLimit: 16384
-  <<: *commonSettings
+  enabled: false

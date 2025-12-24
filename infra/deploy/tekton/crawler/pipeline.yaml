@@ -1,0 +1,102 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: goyoai-backend-crawler
+  namespace: tekton-pipelines
+  labels:
+    goyo-svc: goyoai-backend-crawler 
+spec:
+  params:
+    - name: giturl
+      type: string
+      default: https://github.com/GoyoAi-Service/goyoai-backend-crawler
+    - name: ocir-url
+      type: string
+      default: icn.ocir.io/cn7ipyag4bte/goyoai-backend-crawler-dev
+    - name: ocir-cache-url
+      type: string
+      default: icn.ocir.io/cn7ipyag4bte/goyoai-backend-crawler-cache-dev
+    - name: revision
+      type: string
+      default: qa
+    - name: manifest-file-name
+      type: string
+      description: "Path to the Kubernetes manifest file in the Git repository."
+      default: goyoai-backend-crawler-manifest
+    - name: commit-message
+      type: string
+      default: "Update goyoai-backend-crawler-manifest"
+    - name: project-name
+      type: string
+      default: goyoai-backend-crawler
+    - name: git-short-sha
+      type: string
+      default: goyoai-backend-crawler
+  workspaces:
+    - name: goyoai-backend-crawler
+
+  tasks:
+    - name: generate-timestamp
+      taskRef:
+        name: generate-timestamp
+      params:
+        - name: project-name
+          value: $(params.project-name)
+
+    - name: clone-repository
+      taskRef:
+        name: goyoai-backend-crawler-git-clone
+      params:
+        - name: giturl
+          value: $(params.giturl)
+        - name: revision
+          value: $(params.revision)
+        - name: project-name
+          value: $(params.project-name)
+      runAfter: ["generate-timestamp"]
+      workspaces:
+        - name: goyoai-backend-crawler
+          workspace: goyoai-backend-crawler
+
+    - name: build-container-image
+      taskRef:
+        name: goyoai-backend-crawler-image-build
+      params:
+        - name: ocir-url
+          value: $(params.ocir-url)
+        - name: ocir-cache-url
+          value: $(params.ocir-cache-url)
+        - name: project-name
+          value: $(params.project-name)
+        - name: timestamp
+          value: $(tasks.generate-timestamp.results.timestamp)
+        - name: git-short-sha
+          value: $(params.git-short-sha)        
+      runAfter: ["clone-repository"]
+      workspaces:
+        - name: goyoai-backend-crawler
+          workspace: goyoai-backend-crawler
+
+    - name: manifest-git-push
+      taskRef:
+        name: goyoai-backend-crawler-manifest
+      params:
+        - name: manifest-file-name
+          value: $(params.manifest-file-name)
+        - name: ocir-url
+          value: $(params.ocir-url)
+        - name: commit-message
+          value: $(params.commit-message)
+        - name: revision
+          value: $(params.revision)
+        - name: project-name
+          value: $(params.project-name)
+        - name: timestamp
+          value: $(tasks.generate-timestamp.results.timestamp)
+        - name: git-short-sha
+          value: $(params.git-short-sha)
+        
+      runAfter: ["build-container-image"]
+      workspaces:
+        - name: goyoai-backend-crawler
+          workspace: goyoai-backend-crawler

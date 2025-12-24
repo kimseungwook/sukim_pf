@@ -1,0 +1,133 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: hyper-report-frontend-web-image-build
+  namespace: tekton-pipelines
+  labels:
+    app.kubernetes.io/version: "0.6"
+  annotations:
+    tekton.dev/pipelines.minVersion: "0.17.0"
+    tekton.dev/categories: Image Build
+    tekton.dev/tags: image-build
+    tekton.dev/displayName: "Build and upload container image using Kaniko"
+    tekton.dev/platforms: "linux/amd64,linux/arm64,linux/ppc64le"
+spec:
+  description: >-
+    This Task builds a simple Dockerfile with kaniko and pushes to a registry.
+    This Task stores the image name and digest as results, allowing Tekton Chains to pick up
+    that an image was built & sign it.
+  params:
+    - name: ocir-url
+      type: string
+    - name: ocir-cache-url
+      type: string
+    - name: timestamp
+      type: string
+    - name: project-name
+      type: string
+      default: hyper-report-dev
+    - name: git-short-sha
+      type: string
+    - name: EXTRA_ARGS
+      type: array
+      default: []
+  workspaces:
+    - name: hyper-report-web
+      description: Holds the context and Dockerfile
+    - name: dockerconfig
+      description: Includes a docker `config.json`
+      optional: true
+      mountPath: /kaniko/.docker
+
+  # results:
+  #   - name: IMAGE_DIGEST
+  #     description: Digest of the image just built.
+  #   - name: IMAGE_URL
+  #     description: URL of the image just built.
+
+  steps:
+    - name: list-files
+      image: icn.ocir.io/cntwrbo3mm3p/alpine-linux:3.19.1
+      # image: alpine
+      script: |
+        #!/bin/sh
+        WORKSPACE_PATH=$(workspaces.hyper-report-web.path)
+        PROJECT_DIR=$WORKSPACE_PATH/$(params.project-name)-source
+        echo "Listing files in $PROJECT_DIR :"
+        ls -al $PROJECT_DIR
+    # - name: build-start
+    #   image: alpine
+    #   script: |
+    #     #!/bin/sh
+    #     # Curl 설치
+    #     apk add --no-cache curl
+        
+    #     # 슬랙 웹훅 URL
+    #     SLACK_WEBHOOK_URL="https://hooks.slack.com/services/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"
+        
+    #     # 슬랙 메시지 내용
+    #     SLACK_MESSAGE="$(params.project-name) Docker Build 시작"
+
+    #     # 슬랙에 메시지 전송
+    #     curl -X POST -H 'Content-type: application/json' \
+    #     --data '{"text":"'"$SLACK_MESSAGE"'"}' \
+    #     $SLACK_WEBHOOK_URL
+
+    - name: build-and-push
+      # workingDir: $(workspaces.source.path)
+      image: gcr.io/kaniko-project/executor:v1.5.1@sha256:c6166717f7fe0b7da44908c986137ecfeab21f31ec3992f6e128fff8a94be8a5
+      env:
+      - name: VUE_APP_ENVIRONMENT
+        value: "PRODUCTION"
+      - name: VUE_APP_API_HOST
+        value: "http://hyper-report-backend-api.hr-app-backend.svc.cluster.local:5000/"
+      - name: VUE_APP_INTERVAL_TOKEN_REFRESH
+        value: "120"
+      - name: VUE_APP_INTERVAL_TOKEN_REFRESH_CHECK
+        value: "90"
+      - name: VUE_APP_INTERVAL_AUTO_LOGOUT
+        value: "1800"
+      - name: VUE_APP_INTERVAL_AUTO_LOGOUT_ALERT
+        value: "600"
+      - name: VUE_APP_AES_SECRET_KEY
+        value: "pP6WXxd/FwMRpVbLW9za57+5h9DNr64="
+      - name: VUE_APP_AES_SECRET_IV
+        value: "FuvXhZ6qmZZKJg=="
+      - name: VUE_APP_SENDBIRD_APP_KEY
+        value: "97D323FF-D193-402B-BEDF-8E23D7F5AD6F"
+      - name: VUE_APP_AMPLITUDE_KEY
+        value: "da2dbc469bbf11f914be75f52ddef9d5"
+      command:
+          - /kaniko/executor
+      args:
+        - --context=$(workspaces.hyper-report-web.path)/$(params.project-name)-source
+        - --dockerfile=$(workspaces.hyper-report-web.path)/$(params.project-name)-source/Dockerfile
+        - --destination=$(params.ocir-url):$(params.git-short-sha)-$(params.timestamp)
+        # - --docker-config=/kaniko/.docker/
+        - --force
+        - --skip-tls-verify
+        - --use-new-run
+        - --cache=false
+        - --cache-repo=$(params.ocir-cache-url)
+        - --cache-copy-layers
+        # - --cache-run-layers
+
+    # - name: build-end
+    #   image: alpine
+    #   script: |
+    #     #!/bin/sh
+    #     # Curl 설치
+    #     apk add --no-cache curl
+    #     echo "Listing files in $(workspaces.hyper-report-web.path):"
+    #     ls -al $(workspaces.hyper-report-web.path)
+        
+    #     # 슬랙 웹훅 URL
+    #     SLACK_WEBHOOK_URL="https://hooks.slack.com/services/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"
+        
+    #     # 슬랙 메시지 내용
+    #     SLACK_MESSAGE="$(params.project-name) ECR Docker Image Push 완료"
+
+    #     # 슬랙에 메시지 전송
+    #     curl -X POST -H 'Content-type: application/json' \
+    #     --data '{"text":"'"$SLACK_MESSAGE"'"}' \
+    #     $SLACK_WEBHOOK_URL

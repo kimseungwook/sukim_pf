@@ -1,5 +1,75 @@
-pwgen -s 50 1
-openssl rand -base64 36
+# =============================================================================
+# Authentik Installation Guide
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Step 1: Namespace 생성
+# -----------------------------------------------------------------------------
+kubectl create namespace authentik
+
+# -----------------------------------------------------------------------------
+# Step 2: Secret 생성
+# -----------------------------------------------------------------------------
+kubectl apply -f secret.yaml
+
+# -----------------------------------------------------------------------------
+# Step 3: Helm Repository 추가 및 업데이트
+# -----------------------------------------------------------------------------
 helm repo add authentik https://charts.goauthentik.io
 helm repo update
-helm upgrade --install goyo-authentik authentik/authentik -f authentik/values.yaml -n authentik
+
+# -----------------------------------------------------------------------------
+# Step 4: Valkey 설치 (필수 - 최신 버전에서 subchart 제거됨)
+# -----------------------------------------------------------------------------
+helm upgrade --install authentik-valkey oci://registry-1.docker.io/bitnamicharts/valkey \
+  -f valkey_values.yaml \
+  --version 2025.10.3 \
+  -n authentik
+
+# Valkey 설치 확인
+kubectl get pods -n authentik -l app.kubernetes.io/name=valkey
+
+# -----------------------------------------------------------------------------
+# Step 5: Authentik 설치
+# -----------------------------------------------------------------------------
+helm upgrade --install authentik authentik/authentik \
+  -f values.yaml \
+  -n authentik
+
+# -----------------------------------------------------------------------------
+# Step 6: 설치 확인
+# -----------------------------------------------------------------------------
+kubectl get pods -n authentik
+kubectl get svc -n authentik
+
+# 초기 admin 비밀번호 확인 (서버 로그에서)
+kubectl logs -n authentik -l app.kubernetes.io/component=server | grep -i password
+
+# -----------------------------------------------------------------------------
+# Troubleshooting
+# -----------------------------------------------------------------------------
+# Pod 상태 확인
+kubectl describe pod -n authentik -l app.kubernetes.io/name=authentik
+
+# PostgreSQL 연결 테스트
+kubectl exec -it -n authentik authentik-postgresql-0 -- \
+  psql -U authentik -d authentik -c "SELECT 1"
+
+# Valkey 연결 테스트
+kubectl exec -it -n authentik authentik-valkey-primary-0 -- valkey-cli ping
+
+# -----------------------------------------------------------------------------
+# 업그레이드
+# -----------------------------------------------------------------------------
+helm repo update
+helm upgrade authentik-valkey oci://registry-1.docker.io/bitnamicharts/valkey -f valkey_values.yaml -n authentik
+helm upgrade authentik authentik/authentik -f values.yaml -n authentik
+
+# -----------------------------------------------------------------------------
+# 삭제
+# -----------------------------------------------------------------------------
+helm uninstall authentik -n authentik
+helm uninstall authentik-valkey -n authentik
+kubectl delete secret -n authentik authentik-secrets
+kubectl delete pvc -n authentik --all
+kubectl delete namespace authentik

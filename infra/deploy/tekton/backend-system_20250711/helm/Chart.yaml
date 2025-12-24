@@ -1,0 +1,28 @@
+# 최적화된 Chart.yaml
+apiVersion: v2
+name: tekton-backend-system
+description: |
+  Optimized Helm chart for Goyoai Backend System CI/CD
+  - Supports ReadWriteOnce PVC with module isolation
+  - Unified pipeline templates with dynamic module support
+  - Mono Repo structure friendly
+  - Easy extension for new modules
+type: application
+version: 2.0.0
+appVersion: "2.0.0"
+home: https://github.com/GoyoAi-Service/goyoai-web-manifest
+sources:
+  - https://github.com/kimseungwook/sukim-backend-system
+maintainers:
+  - name: DevOps Team
+    email: devops@goyoai.com
+keywords:
+  - tekton
+  - ci-cd
+  - backend
+  - mono-repo
+  - kubernetes
+annotations:
+  category: CI/CD
+  "tekton.dev/pipelines.minVersion": "0.17.0"
+  "kubernetes.io/min-version": "1.20"

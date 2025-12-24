@@ -1,0 +1,168 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: descheduler
+  namespace: goyoai-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: descheduler
+  template:
+    metadata:
+      labels:
+        app: descheduler
+    spec:
+      serviceAccountName: descheduler
+      containers:
+      - name: descheduler
+        image: registry.k8s.io/descheduler/descheduler:v0.24.1
+        imagePullPolicy: IfNotPresent
+        command:
+        - "/bin/descheduler"
+        args:
+        - "--policy-config-file=/policy-dir/policy.yaml"
+        - "--descheduling-interval=120s"
+        - "--v=3"
+        volumeMounts:
+        - mountPath: /policy-dir
+          name: policy-volume
+      volumes:
+      - name: policy-volume
+        configMap:
+          name: descheduler-policy
+      nodeSelector:
+        goyo-svc: monitoring
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: descheduler-policy
+  namespace: goyoai-web
+data:
+  policy.yaml: |
+    apiVersion: "descheduler/v1alpha2"
+    kind: "DeschedulerPolicy"
+    profiles:
+    - name: LowNodeUtilizationAIServer
+      pluginConfig:
+      - name: LowNodeUtilization
+        args:
+          thresholds:
+            cpu: 30
+            memory: 30
+            pods: 30
+          targetThresholds:
+            cpu: 60
+            memory: 60
+            pods: 60
+          nodeResourceUtilizationThresholds:
+            cpu: 70
+            memory: 70
+            pods: 70
+    - name: LowNodeUtilizationBackendRelay
+      pluginConfig:
+      - name: LowNodeUtilization
+        args:
+          thresholds:
+            cpu: 20
+            memory: 30
+            pods: 30
+          targetThresholds:
+            cpu: 50
+            memory: 60
+            pods: 60
+          nodeResourceUtilizationThresholds:
+            cpu: 80
+            memory: 80
+            pods: 80
+    - name: LowNodeUtilizationBackPortal
+      pluginConfig:
+      - name: LowNodeUtilization
+        args:
+          thresholds:
+            cpu: 20
+            memory: 30
+            pods: 30
+          targetThresholds:
+            cpu: 50
+            memory: 60
+            pods: 60
+          nodeResourceUtilizationThresholds:
+            cpu: 80
+            memory: 80
+            pods: 80
+    - name: LowNodeUtilizationFrontendWeb
+      pluginConfig:
+      - name: LowNodeUtilization
+        args:
+          thresholds:
+            cpu: 20
+            memory: 25
+            pods: 30
+          targetThresholds:
+            cpu: 50
+            memory: 55
+            pods: 60
+          nodeResourceUtilizationThresholds:
+            cpu: 80
+            memory: 85
+            pods: 80
+    strategies:
+      RemovePodsViolatingNodeAffinity:
+        enabled: true
+        params:
+          nodeAffinityType:
+          - requiredDuringSchedulingIgnoredDuringExecution
+      RemovePodsViolatingInterPodAntiAffinity:
+        enabled: true
+      RemovePodsViolatingTopologySpreadConstraint:
+        enabled: true
+      RemoveDuplicates:
+        enabled: true
+      RemovePodsViolatingNodeTaints:
+        enabled: true
+    namespacesInclude:
+    - goyoai-web
+    nodeSelectorInclude:
+    - goyo-svc=ai-server
+    - goyo-svc=backend-relay
+    - goyo-svc=back-portal
+    - goyo-svc=frontend-web
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: descheduler-cluster-role
+rules:
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "update"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "watch", "list"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "watch", "list", "delete"]
+- apiGroups: [""]
+  resources: ["pods/eviction"]
+  verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: descheduler-cluster-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: descheduler-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: descheduler
+  namespace: goyoai-web
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: descheduler
+  namespace: goyoai-web

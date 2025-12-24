@@ -1,0 +1,158 @@
+# bbrick_oci/otel-collector/tempo-values.yaml
+mode: deployment
+nameOverride: "otel-collector-tempo"
+fullnameOverride: "otel-collector-tempo"
+
+image:
+  repository: docker.io/otel/opentelemetry-collector-contrib
+  pullPolicy: IfNotPresent
+  tag: "0.118.0"
+  digest: ""
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 200m
+    memory: 400Mi
+
+useGOMEMLIMIT: true
+
+ports:
+  otlp:
+    enabled: true
+    containerPort: 4317
+    servicePort: 4317
+    protocol: TCP
+  otlp-http:
+    enabled: true
+    containerPort: 4318
+    servicePort: 4318
+    protocol: TCP
+  metrics:
+    enabled: true
+    containerPort: 8888
+    servicePort: 8888
+    protocol: TCP
+  healthcheck:  # health_check를 healthcheck로 변경
+    enabled: true
+    containerPort: 13133
+    servicePort: 13133
+    protocol: TCP
+
+command:
+  name: otelcol-contrib
+
+service:
+  enabled: true
+  type: ClusterIP
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8888"
+
+clusterRole:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: ["pods", "nodes", "namespaces"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: [""]
+      resources: ["nodes/metrics", "nodes/stats"]
+      verbs: ["get", "list", "watch"]
+
+serviceAccount:
+  create: true
+
+config:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+  processors:
+    batch:
+      send_batch_size: 10000
+      timeout: 5s
+      send_batch_max_size: 20000
+    
+    memory_limiter:
+      check_interval: 2s
+      limit_percentage: 75
+      spike_limit_percentage: 20
+    
+    k8sattributes:
+      auth_type: serviceAccount
+      passthrough: false
+      extract:
+        metadata:
+          - k8s.pod.name
+          - k8s.pod.uid
+          - k8s.deployment.name
+          - k8s.namespace.name
+          - k8s.node.name
+          - k8s.container.name
+    probabilistic_sampler:
+      hash_seed: 22
+      sampling_percentage: 100
+
+  exporters:
+    otlp/tempo:
+      endpoint: goyo-tempo-distributed-distributor.monitoring.svc.cluster.local:4317
+      tls:
+        insecure: true
+      retry_on_failure:
+        enabled: true
+        initial_interval: 5s
+        max_interval: 30s
+        max_elapsed_time: 300s
+      sending_queue:
+        enabled: true
+        num_consumers: 10
+        queue_size: 5000
+    
+    debug:  # logging을 debug로 변경
+      verbosity: detailed
+
+  service:
+    telemetry:
+      metrics:
+        address: 0.0.0.0:8888
+        level: detailed
+      logs:
+        level: debug
+        development: true
+    
+    extensions: [health_check]
+    
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, k8sattributes, batch, probabilistic_sampler]
+        exporters: [otlp/tempo, debug]
+
+tolerations:
+  - key: "goyo-svc"
+    operator: "Equal"
+    value: "web-apps"
+    effect: "NoSchedule"
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: "goyo-svc"
+          operator: In
+          values:
+          - "web-apps"
+
+serviceMonitor:
+  enabled: true
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8888"

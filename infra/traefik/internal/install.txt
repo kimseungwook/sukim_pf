@@ -1,0 +1,1 @@
+helm upgrade --install gointern-backoffice traefik/traefik -n goyoai-web -f goyoai-traefik/internal/traefik-values.yaml

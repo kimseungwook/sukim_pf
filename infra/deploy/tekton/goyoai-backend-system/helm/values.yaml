@@ -1,0 +1,54 @@
+# values.yaml
+gitUrl: "https://github.com/GoyoAi-Service/goyoai-backend-system"
+gitRevisions: ["sukim-test","develop-web"]
+
+# EventListener 설정
+el_serviceAccountName: "tekton-triggers-sa"
+el_node_selector_key: "goyo-svc"
+el_node_selector_value: "deploy"
+el_tolerations_key: "goyo-svc"
+el_tolerations_value: "deploy"
+el_tolerations_operator: "Equal"
+el_tolerations_effect: "NoSchedule"
+
+# 일반 Task용 노드 설정
+trigger_node_selector_key: "goyo-svc"
+trigger_node_selector_value: "deploy"
+trigger_tolerations_key: "goyo-svc"
+trigger_tolerations_value: "deploy"
+trigger_tolerations_operator: "Equal"
+trigger_tolerations_effect: "NoSchedule"
+
+# Container images
+container_registry_secretName: "harbor-registry-secret"
+common_alpine_url: "gdhb.goyoai.com/common/alpine:3.20.3"
+common_alpine_git_url: "gdhb.goyoai.com/common/git:2.45.2"
+container_registry_url: "gdhb.goyoai.com/goyoai-web"
+container_registry_cache_url: "gdhb.goyoai.com/goyoai-web-cache"
+
+# Kustomize 설정
+kustomize_git_url: "https://github.com/GoyoAi-Service/goyoai-web-manifest"
+back_kustomize_git_branch: "dev"  # ← branch 변경
+
+# ⚠️ 아래 설정들은 이제 동적으로 처리되므로 사용 안 함
+# back_kustomize_directory: "overlays/dev/{module-name}"  # 동적 생성
+# back_deployment_name: "{module-name}"  # 동적 생성
+
+manifestFileName: "goyoai-backend-system-manifest.yaml"
+commitMessage: "Update Kubernetes manifest"
+
+# 프로젝트 설정
+project_name: "goyoai-backend-system"
+
+# Task 이름
+system_build_task_name: "goyoai-gointern-system-image-build"
+
+#dockerfile 
+docker_unified: "Dockerfile.unified"
+docker_kapt: "Dockerfile.kapt"
+docker_aify: "Dockerfile.aify_unified"
+docker_bo: "Dockerfile.bo"
+
+# Slack
+slack_webhook_url: "https://hooks.slack.com/services/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"
+slack_message: "Build completed"

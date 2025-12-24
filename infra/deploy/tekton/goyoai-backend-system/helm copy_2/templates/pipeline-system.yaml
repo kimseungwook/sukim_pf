@@ -1,0 +1,115 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: goyoai-gointern-system
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: giturl
+      type: string
+    - name: container-registry-url
+      type: string
+    - name: container-registry-cache-url
+      type: string
+    - name: revision
+      type: string
+    - name: manifest-file-name
+      type: string
+      description: "Path to the Kubernetes manifest file in the Git repository."
+    - name: commit-message
+      type: string
+      default: "Update Kubernetes manifest"
+    - name: project-name
+      type: string
+    - name: git-short-sha
+      type: string
+    - name: module-name
+      type: string
+      description: "The module to build"
+    - name: dockerfile-name
+      type: string
+      description: "Name of the Dockerfile to use"
+      
+  workspaces:
+    - name: {{ .Values.project_name }}
+
+  tasks:
+    - name: generate-timestamp
+      taskRef:
+        name: generate-timestamp
+      params:
+        - name: project-name
+          value: $(params.project-name)
+
+    # 기존 clone task는 그대로 유지 (일반 노드에서 실행)
+    - name: clone-repository
+      taskRef:
+        name: {{ .Values.project_name }}-git-clone
+      params:
+        - name: giturl
+          value: $(params.giturl)
+        - name: revision
+          value: $(params.revision)
+        - name: project-name
+          value: $(params.project-name)
+        - name: module-name
+          value: $(params.module-name)
+      runAfter: ["generate-timestamp"]
+      workspaces:
+        - name: {{ .Values.project_name }}
+          workspace: {{ .Values.project_name }}
+
+    # ✨ 변경: Kaniko Job을 트리거하는 task로 교체
+    - name: build-container-image
+      taskRef:
+        name: {{ .Values.system_build_task_name }}-trigger  # ← 새로운 trigger task
+      params:
+        - name: container-registry-url
+          value: $(params.container-registry-url)
+        - name: container-registry-cache-url
+          value: $(params.container-registry-cache-url)
+        - name: project-name
+          value: $(params.project-name)
+        - name: timestamp
+          value: $(tasks.generate-timestamp.results.timestamp)
+        - name: git-short-sha
+          value: $(params.git-short-sha)
+        - name: module-name
+          value: $(params.module-name)
+        - name: dockerfile-name
+          value: $(params.dockerfile-name)
+        - name: giturl
+          value: $(params.giturl)
+        - name: revision
+          value: $(params.revision)
+      runAfter: ["clone-repository"]
+      workspaces:
+        - name: {{ .Values.project_name }}
+          workspace: {{ .Values.project_name }}
+
+    # manifest-git-push는 그대로 유지 (일반 노드에서 실행)
+    - name: manifest-git-push
+      taskRef:
+        name: {{ .Values.project_name }}-manifest
+      params:
+        - name: manifest-file-name
+          value: $(params.manifest-file-name)
+        - name: container-registry-url
+          value: $(params.container-registry-url)
+        - name: commit-message
+          value: $(params.commit-message)
+        - name: revision
+          value: $(params.revision)
+        - name: project-name
+          value: $(params.project-name)
+        - name: timestamp
+          value: $(tasks.generate-timestamp.results.timestamp)
+        - name: git-short-sha
+          value: $(params.git-short-sha)
+        - name: module-name
+          value: $(params.module-name)
+        
+      runAfter: ["build-container-image"]
+      workspaces:
+        - name: {{ .Values.project_name }}
+          workspace: {{ .Values.project_name }}

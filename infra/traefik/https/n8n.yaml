@@ -1,0 +1,26 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: n8n-https
+  namespace: traefik
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`gdn8n.goyoai.com`)
+      priority: 10
+      services:
+        - name: goyo-n8n
+          namespace: n8n
+          port: 5678
+    - kind: Rule
+      match: Host(`gdn8n.goyoai.com`) && PathPrefix(`/grpc`)
+      priority: 11
+      services:
+        - name: goyo-n8n
+          namespace: n8n
+          port: 5678
+          scheme: h2c
+  tls:
+    secretName: goyoai-webs-tls

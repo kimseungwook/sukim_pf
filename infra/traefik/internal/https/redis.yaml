@@ -1,0 +1,36 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: redis-internal-http
+  namespace: traefik
+spec:
+  entryPoints:
+    - web
+  routes:
+    - kind: Rule
+      match: Host(`gdrd.go-intern.io`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - name: goyo-redisinsight
+          namespace: redis
+          port: 5540
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: redis-internal-https
+  namespace: traefik
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`gdrd.go-intern.io`)
+      priority: 10
+      services:
+        - name: goyo-redisinsight
+          namespace: redis
+          port: 5540
+  tls: 
+    secretName: goyoai-web-backoffice-tls

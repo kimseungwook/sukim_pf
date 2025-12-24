@@ -1,0 +1,42 @@
+# --- 기본 이미지 ---
+common_alpine_url: "gdhb.goyoai.com/common/alpine:3.20.3"
+common_alpine_git_url: "gdhb.goyoai.com/common/git:2.45.2"
+
+# --- EventListener 서비스 계정 ---
+el_serviceAccountName: "tekton-triggers-sa"
+
+# --- EventListener Pod 스케줄링 ---
+el_node_selector_key: "goyo-svc"
+el_node_selector_value: "deploy"
+el_tolerations_key: "goyo-svc"
+el_tolerations_value: "deploy"
+el_tolerations_operator: "Equal"
+el_tolerations_effect: "NoSchedule"
+
+# --- TaskRun Pod 스케줄링 ---
+trigger_node_selector_key: "goyo-svc"
+trigger_node_selector_value: "deploy"
+trigger_node_affinity_operator: "In"
+trigger_tolerations_key: "goyo-svc"
+trigger_tolerations_value: "deploy"
+trigger_tolerations_operator: "Equal"
+trigger_tolerations_effect: "NoSchedule"
+
+# --- TaskRun 워크스페이스 ---
+workspace_pvc_name: "kustomize-patch-pvc"
+
+# --- 핵심 파라미터 ---
+kustomize_git_url: "https://github.com/GoyoAi-Service/goyoai-web-manifest"
+project_name: "kustomize-patch"
+secret_token: "tekton-ci-token"
+
+# [추가] Git 및 Kustomize 경로를 변수화
+kustomize_git_branch: "dev"
+kustomize_overlay_path: "overlays/dev" # (예: "overlays/staging", "overlays/prod")
+
+# PVC 템플릿에 필요한 스토리지 설정
+storage_ClassName: "oci-bv"
+storage_size: "1Gi"
+
+# --- 알림 설정 ---
+slack_webhook_url: "https://hooks.slack.com/services/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"

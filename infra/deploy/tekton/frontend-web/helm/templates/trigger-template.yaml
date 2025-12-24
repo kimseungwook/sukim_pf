@@ -1,0 +1,81 @@
+# Frontend 전용 Trigger Template
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: {{ .Values.project_name }}
+  namespace: tekton-pipelines
+spec:
+  params:
+    - name: gitrevision
+      description: The git revision
+      default: "main"  # ✅ main 기본값
+    - name: gitrepositoryurl
+      description: The git repository URL
+      default: {{ .Values.gitUrl }}
+    - name: git-sha
+    - name: git-short-sha
+    - name: deploy-env
+    - name: git-repo-name
+    - name: app-name  # ✅ module-name 대신 app-name
+      description: The frontend app to build
+      default: "goyoai-gointern-web"
+    - name: pvc-name
+      description: PVC name based on environment
+    - name: dockerfile-name
+      description: Name of the Dockerfile to use
+      default: "dockerfile-b2b-prod"
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: $(tt.params.app-name)-  # ✅ app-name 사용
+        namespace: tekton-pipelines
+      spec:
+        pipelineRef:
+          name: goyoai-gointern-web  # ✅ 올바른 pipeline 이름
+        params:
+          - name: giturl
+            value: "$(tt.params.gitrepositoryurl)"
+          - name: container-registry-url
+            value: "{{ .Values.container_registry_url }}"
+          - name: container-registry-cache-url
+            value: "{{ .Values.container_registry_cache_url }}"
+          - name: manifest-file-name
+            value: "{{ .Values.manifestFileName }}"
+          - name: commit-message
+            value: "Update Frontend $(tt.params.git-repo-name):$(tt.params.gitrevision) git hash: $(tt.params.git-short-sha)"
+          - name: project-name
+            value: "{{ .Values.project_name }}"  # ✅ 고정값 사용
+          - name: revision
+            value: "$(tt.params.gitrevision)"
+          - name: git-short-sha
+            value: "$(tt.params.git-short-sha)"
+          - name: app-name  # ✅ module-name 대신 app-name
+            value: "$(tt.params.app-name)"
+          - name: dockerfile-name
+            value: "$(tt.params.dockerfile-name)"
+        workspaces:
+          - name: {{ .Values.project_name }}
+            persistentVolumeClaim:
+              claimName: $(tt.params.pvc-name)
+          - name: dockerconfig
+            secret:
+              secretName: {{ .Values.container_registry_secretName}}
+        serviceAccountName: {{ .Values.git_serviceAccountName}}   
+        podTemplate:         
+          nodeSelector:
+            {{ .Values.trigger_node_selector_key }}: "{{ .Values.trigger_node_selector_value }}"
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: "{{ .Values.trigger_node_selector_key }}"
+                    operator: {{ .Values.trigger_node_affinity_operator }}
+                    values: 
+                    - "{{ .Values.trigger_node_selector_value }}"
+          tolerations:
+          - key: "{{ .Values.trigger_tolerations_key }}"
+            operator: "{{ .Values.trigger_tolerations_operator }}"
+            value: "{{ .Values.trigger_tolerations_value }}"
+            effect: "{{ .Values.trigger_tolerations_effect }}"

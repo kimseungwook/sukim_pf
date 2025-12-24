@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  namespace: kube-system
+  name: harbor-openssl-setup
+  labels:
+    k8s-app: harbor-openssl-setup
+spec:
+  selector:
+    matchLabels:
+      k8s-app: harbor-openssl-setup
+  template:
+    metadata:
+      labels:
+        k8s-app: harbor-openssl-setup
+    spec:
+      hostPID: true
+      hostNetwork: true
+      tolerations:
+      - key: "goyo-svc"
+        operator: "Equal"
+        value: "backend-relay"
+        effect: "NoSchedule"
+      - key: "goyo-svc"
+        operator: "Equal"
+        value: "frontend-web"
+        effect: "NoSchedule"
+      - key: "goyo-svc"
+        operator: "Equal"
+        value: "ai-server"
+        effect: "NoSchedule"
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      initContainers:
+      - name: init-node
+        command: ["nsenter"]
+        args:
+        - "--mount=/proc/1/ns/mnt"
+        - "--"
+        - "sh"
+        - "-c"
+        - >
+          mkdir -p /etc/crio/certs.d/gdharbor.goyoai.com &&
+          echo "$TRUSTED_CERT" > /etc/crio/certs.d/gdharbor.goyoai.com/ca.crt &&
+          if ! grep -q 'insecure_registries.*gdharbor\.goyoai\.com' /etc/crio/crio.conf; then
+            sed -i '/^\[crio\.image\]/a insecure_registries = ["gdharbor.goyoai.com"]' /etc/crio/crio.conf;
+          fi &&
+          systemctl restart crio
+        image: oraclelinux:8
+        env:
+        - name: TRUSTED_CERT
+          valueFrom:
+            configMapKeyRef:
+              name: harbor-ca
+              key: ca.crt
+        securityContext:
+          privileged: true
+      containers:
+      - name: wait
+        image: k8s.gcr.io/pause:3.1

@@ -1,0 +1,10 @@
+apiVersion: ingress.oraclecloud.com/v1beta1
+kind: IngressClassParameters
+metadata:
+  name: argocd-ingress-params
+  namespace: argocd
+spec:
+  loadBalancerName: "argocd"
+  isPrivate: false
+  minBandwidthMbps: 10
+  maxBandwidthMbps: 10

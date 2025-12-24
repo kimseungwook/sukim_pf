@@ -1,0 +1,13 @@
+apiVersion: v2
+name: tekton-dev-gitops-kustomize
+description: A Helm chart for Goyoai Web Back GitOps Update Pipeline
+type: application
+version: 0.2.0
+appVersion: 2.0.0
+keywords:
+  - tekton
+  - gitops
+  - cicd
+maintainers:
+  - name: GoyoAI DevOps Team
+    email: su.kim@uclick.co.kr

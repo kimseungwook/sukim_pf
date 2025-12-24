@@ -1,0 +1,17 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: tekton-trigger-frontend-react-https
+  namespace: tekton-pipelines
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`gdwfrontreactdev.goyoai.com`)
+      priority: 16
+      services:
+        - name: el-goyoai-web-front-react
+          port: 8080
+  tls: 
+    secretName: tekton-trigger-front-react-tls

@@ -1,0 +1,349 @@
+# 기존 구조와 호환되는 기본 태스크들
+# templates/tasks.yaml
+
+# Git Clone Task
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: {{ .Values.project_name }}-git-clone
+  namespace: tekton-pipelines
+  labels:
+    {{- include "backend-system.labels" . | nindent 4 }}
+    type: git-clone
+spec:
+  workspaces:
+    - name: {{ .Values.project_name }}
+  params:
+    - name: revision
+      type: string
+    - name: giturl
+      type: string
+    - name: project-name
+      type: string
+    - name: module-name
+      type: string
+  results:
+    - name: commit
+      description: The git commit hash
+  steps:
+    - name: clean-workspace
+      image: {{ .Values.common_alpine_url }}
+      script: |
+        #!/bin/sh
+        WORKSPACE_PATH=$(workspaces.{{ .Values.project_name }}.path)
+        MODULE_DIR=$WORKSPACE_PATH/$(params.module-name)
+        PROJECT_DIR=$MODULE_DIR/source
+        
+        mkdir -p $PROJECT_DIR
+        rm -rf $PROJECT_DIR/.[!.]* $PROJECT_DIR/*
+        echo "✅ Project directory cleaned"
+        
+    - name: clone-repository
+      image: {{ .Values.common_alpine_git_url }}
+      script: |
+        #!/bin/sh
+        set -e
+        WORKSPACE_PATH=$(workspaces.{{ .Values.project_name }}.path)
+        MODULE_DIR=$WORKSPACE_PATH/$(params.module-name)
+        PROJECT_DIR=$MODULE_DIR/source
+        
+        mkdir -p $PROJECT_DIR
+        git config --global --add safe.directory $PROJECT_DIR
+        git clone -b $(params.revision) $(params.giturl) $PROJECT_DIR
+        cd $PROJECT_DIR
+        git rev-parse --short HEAD > $(results.commit.path)
+        echo "✅ Repository cloned successfully"
+
+# Container Build Tasks (System)
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: {{ .Values.system_build_task_name }}
+  namespace: tekton-pipelines
+  labels:
+    {{- include "backend-system.labels" . | nindent 4 }}
+    type: container-build
+    module: system
+spec:
+  description: "Build system module container image"
+  params:
+    - name: container-registry-url
+      type: string
+    - name: container-registry-cache-url
+      type: string
+    - name: timestamp
+      type: string
+    - name: project-name
+      type: string
+    - name: git-short-sha
+      type: string
+    - name: module-name
+      type: string
+    - name: dockerfile-name
+      type: string
+  workspaces:
+    - name: {{ .Values.project_name }}
+
+  steps:
+    - name: build-and-push
+      image: {{ .Values.common_kaniko_url }}
+      args:
+        - --context=$(workspaces.{{ .Values.project_name }}.path)/$(params.module-name)/source
+        - --dockerfile=$(workspaces.{{ .Values.project_name }}.path)/$(params.module-name)/source/$(params.dockerfile-name)
+        - --destination=$(params.container-registry-url)/$(params.module-name):$(params.git-short-sha)-$(params.timestamp)
+        - --force
+        - --skip-tls-verify
+        - --cache=true
+        - --cache-repo=$(params.container-registry-cache-url)/$(params.module-name)
+      env:
+        - name: GRADLE_USER_HOME
+          value: "/workspace/gradle-home"
+        - name: GRADLE_OPTS
+          value: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.workers.max=2"
+      volumeMounts:
+        - name: docker-config
+          mountPath: /kaniko/.docker
+        - name: gradle-cache-dir
+          mountPath: /workspace/gradle-home
+      securityContext:
+        runAsUser: 0
+
+  volumes:
+    - name: docker-config
+      secret:
+        secretName: {{ .Values.container_registry_secretName }}
+        items:
+          - key: .dockerconfigjson
+            path: config.json
+    - name: gradle-cache-dir
+      persistentVolumeClaim:
+        claimName: {{ .Values.system_gradle_cache_pvc_name }}
+
+# Container Build Tasks (Portal)
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: {{ .Values.portal_build_task_name }}
+  namespace: tekton-pipelines
+  labels:
+    {{- include "backend-system.labels" . | nindent 4 }}
+    type: container-build
+    module: portal
+spec:
+  description: "Build portal module container image"
+  params:
+    - name: container-registry-url
+      type: string
+    - name: container-registry-cache-url
+      type: string
+    - name: timestamp
+      type: string
+    - name: project-name
+      type: string
+    - name: git-short-sha
+      type: string
+    - name: module-name
+      type: string
+    - name: dockerfile-name
+      type: string
+  workspaces:
+    - name: {{ .Values.project_name }}
+
+  steps:
+    - name: build-and-push
+      image: {{ .Values.common_kaniko_url }}
+      args:
+        - --context=$(workspaces.{{ .Values.project_name }}.path)/$(params.module-name)/source
+        - --dockerfile=$(workspaces.{{ .Values.project_name }}.path)/$(params.module-name)/source/$(params.dockerfile-name)
+        - --destination=$(params.container-registry-url)/$(params.module-name):$(params.git-short-sha)-$(params.timestamp)
+        - --force
+        - --skip-tls-verify
+        - --cache=true
+        - --cache-repo=$(params.container-registry-cache-url)/$(params.module-name)
+      env:
+        - name: GRADLE_USER_HOME
+          value: "/workspace/gradle-home"
+        - name: GRADLE_OPTS
+          value: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.workers.max=2"
+      volumeMounts:
+        - name: docker-config
+          mountPath: /kaniko/.docker
+        - name: gradle-cache-dir
+          mountPath: /workspace/gradle-home
+      securityContext:
+        runAsUser: 0
+
+  volumes:
+    - name: docker-config
+      secret:
+        secretName: {{ .Values.container_registry_secretName }}
+        items:
+          - key: .dockerconfigjson
+            path: config.json
+    - name: gradle-cache-dir
+      persistentVolumeClaim:
+        claimName: {{ .Values.portal_gradle_cache_pvc_name }}
+
+# Container Build Tasks (Aify)
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: {{ .Values.aify_build_task_name }}
+  namespace: tekton-pipelines
+  labels:
+    {{- include "backend-system.labels" . | nindent 4 }}
+    type: container-build
+    module: aify
+spec:
+  description: "Build aify module container image"
+  params:
+    - name: container-registry-url
+      type: string
+    - name: container-registry-cache-url
+      type: string
+    - name: timestamp
+      type: string
+    - name: project-name
+      type: string
+    - name: git-short-sha
+      type: string
+    - name: module-name
+      type: string
+    - name: dockerfile-name
+      type: string
+  workspaces:
+    - name: {{ .Values.project_name }}
+
+  steps:
+    - name: build-and-push
+      image: {{ .Values.common_kaniko_url }}
+      args:
+        - --context=$(workspaces.{{ .Values.project_name }}.path)/$(params.module-name)/source
+        - --dockerfile=$(workspaces.{{ .Values.project_name }}.path)/$(params.module-name)/source/$(params.dockerfile-name)
+        - --destination=$(params.container-registry-url)/$(params.module-name):$(params.git-short-sha)-$(params.timestamp)
+        - --force
+        - --skip-tls-verify
+        - --cache=true
+        - --cache-repo=$(params.container-registry-cache-url)/$(params.module-name)
+      env:
+        - name: GRADLE_USER_HOME
+          value: "/workspace/gradle-home"
+        - name: GRADLE_OPTS
+          value: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.workers.max=2"
+      volumeMounts:
+        - name: docker-config
+          mountPath: /kaniko/.docker
+        - name: gradle-cache-dir
+          mountPath: /workspace/gradle-home
+      securityContext:
+        runAsUser: 0
+
+  volumes:
+    - name: docker-config
+      secret:
+        secretName: {{ .Values.container_registry_secretName }}
+        items:
+          - key: .dockerconfigjson
+            path: config.json
+    - name: gradle-cache-dir
+      persistentVolumeClaim:
+        claimName: {{ .Values.aify_gradle_cache_pvc_name }}
+
+# Manifest Update Task
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: {{ .Values.project_name }}-manifest
+  namespace: tekton-pipelines
+  labels:
+    {{- include "backend-system.labels" . | nindent 4 }}
+    type: manifest-update
+spec:
+  description: "Update Kubernetes manifest"
+  params:
+    - name: container-registry-url
+      type: string
+    - name: commit-message
+      type: string
+    - name: project-name
+      type: string
+    - name: timestamp
+      type: string
+    - name: git-short-sha
+      type: string
+    - name: module-name
+      type: string
+    - name: revision
+      type: string
+    - name: manifest-file-name
+      type: string
+  workspaces:
+    - name: {{ .Values.project_name }}
+  steps:
+    - name: update-manifest
+      image: {{ .Values.common_alpine_git_url }}
+      script: |
+        #!/bin/sh
+        set -e
+        echo "🚀 Updating manifest for $(params.module-name)"
+        
+        WORKSPACE_PATH=$(workspaces.{{ .Values.project_name }}.path)
+        PROJECT_DIR=$WORKSPACE_PATH/$(params.project-name)-manifest
+        
+        # Git 설정
+        git config --global user.name "tekton-bot"
+        git config --global user.email "tekton@goyoai.com"
+        
+        # 브랜치별 설정 결정
+        if [ "$(params.module-name)" = "goyoai-gointern-portal" ]; then
+          KUSTOMIZE_BRANCH="{{ .Values.portal_kustomize_git_branch }}"
+          KUSTOMIZE_DIR="{{ .Values.portal_kustomize_directory }}"
+          DEPLOYMENT_NAME="{{ .Values.portal_deployment_name }}"
+        elif [ "$(params.module-name)" = "goyoai-gointern-aify" ]; then
+          KUSTOMIZE_BRANCH="{{ .Values.aify_kustomize_git_branch }}"
+          KUSTOMIZE_DIR="{{ .Values.aify_kustomize_directory }}"
+          DEPLOYMENT_NAME="{{ .Values.aify_deployment_name }}"
+        else
+          KUSTOMIZE_BRANCH="{{ .Values.back_kustomize_git_branch }}"
+          KUSTOMIZE_DIR="{{ .Values.back_kustomize_directory }}"
+          DEPLOYMENT_NAME="{{ .Values.back_deployment_name }}"
+        fi
+        
+        # 매니페스트 저장소 클론
+        rm -rf $PROJECT_DIR
+        git clone --branch $KUSTOMIZE_BRANCH {{ .Values.kustomize_git_url }} $PROJECT_DIR
+        
+        cd $PROJECT_DIR
+        OVERLAY_PATH="$PROJECT_DIR/$KUSTOMIZE_DIR"
+        mkdir -p $OVERLAY_PATH
+        cd $OVERLAY_PATH
+        
+        # 새로운 이미지 태그로 패치 파일 생성
+        IMAGE_TAG="$(params.git-short-sha)-$(params.timestamp)"
+        NEW_IMAGE="$(params.container-registry-url)/$(params.module-name):$IMAGE_TAG"
+        
+        cat <<EOF > deployment_patches.yaml
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: $DEPLOYMENT_NAME
+        spec:
+          template:
+            spec:
+              serviceAccountName: goyoai-vault-be-system
+              containers:
+                - name: ${DEPLOYMENT_NAME}-container
+                  image: $NEW_IMAGE
+        EOF
+        
+        # Git 커밋 및 푸시
+        git add deployment_patches.yaml
+        git commit -m "$(params.commit-message) - $IMAGE_TAG"
+        git push origin $KUSTOMIZE_BRANCH
+        
+        echo "✅ Manifest updated with image: $NEW_IMAGE"

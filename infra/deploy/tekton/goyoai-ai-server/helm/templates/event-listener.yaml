@@ -1,0 +1,71 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: {{ .Values.project_name }}
+  namespace: tekton-pipelines
+spec:
+  serviceAccountName: {{ .Values.el_serviceAccountName }}
+  resources:
+    kubernetesResource:
+      spec:
+        template:
+          spec:
+            nodeSelector:
+              {{ .Values.el_node_selector_key }}: {{ .Values.el_node_selector_value }}
+            tolerations:
+              - key: {{ .Values.el_tolerations_key }}
+                operator: {{ .Values.el_tolerations_operator }}
+                value: {{ .Values.el_tolerations_value }}
+                effect: {{ .Values.el_tolerations_effect }}
+            containers:
+              - resources:
+                  limits:
+                    cpu: "500m"
+                    memory: "128Mi"
+                  requests:
+                    cpu: "250m"
+                    memory: "64Mi"
+  triggers:
+    # ═══════════════════════════════════════════════════
+    # Trigger 1: goyoai-ai-server (Python)
+    # ═══════════════════════════════════════════════════
+    - name: {{ .Values.project_name }}-system
+      interceptors:
+        - ref:
+            name: "github"
+          params:
+            - name: "eventTypes"
+              value: ["push"]
+        - ref:
+            name: "cel"
+          params:
+            - name: "filter"
+              value: |
+                body.ref.split('/')[2] in [{{ range $index, $revision := .Values.gitRevisions }}{{ if $index }},{{ end }}'{{ $revision }}'{{ end }}] &&
+                !body.head_commit.message.contains('[skip-ci]') &&
+                (body.head_commit.message.contains('[bd:all]') ||
+                 body.head_commit.message.contains('[bd:ai-server]') ||
+                 body.head_commit.message.matches('.*\\[bd:[^\\]]*\\bai\\b[^\\]]*\\].*'))
+
+            - name: "overlays"
+              value:
+                - key: sha
+                  expression: "body.head_commit.id"
+                - key: short_sha
+                  expression: "body.head_commit.id.truncate(7)"
+                - key: branch_name
+                  expression: "body.ref.split('/')[2]"
+                - key: module_name
+                  expression: "'goyoai-ai-server'"
+                - key: dockerfile_name
+                  expression: "'{{ .Values.docker_unified }}'"
+                - key: commit_message
+                  expression: "body.head_commit.message"
+                - key: author_name
+                  expression: "body.head_commit.author.name"
+                - key: author_email
+                  expression: "body.head_commit.author.email"
+      bindings:
+        - ref: {{ .Values.project_name }}
+      template:
+        ref: {{ .Values.project_name }}

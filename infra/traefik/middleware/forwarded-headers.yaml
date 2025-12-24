@@ -1,0 +1,9 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: forwarded-headers
+  namespace: goyoai-web
+spec:
+  headers:
+    customRequestHeaders:
+      X-From-Traefik: "true"  # 디버깅용

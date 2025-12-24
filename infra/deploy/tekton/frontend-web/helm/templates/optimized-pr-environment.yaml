@@ -1,0 +1,48 @@
+# ✅ 1. PVC는 공유 사용 (리소스 절약)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.project_name }}-workspace
+  namespace: tekton-pipelines
+  labels:
+    app: goyoai-gointern-web
+    purpose: shared-workspace
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.storage_ClassName}}
+  resources:
+    requests:
+      storage: 10Gi  # PR과 Main이 공유하므로 조금 더 크게
+---
+# ✅ 2. PR 전용 정리 Task
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: {{ .Values.project_name }}-pr-cleanup
+  namespace: tekton-pipelines
+spec:
+  description: Clean up PR environment resources
+  params:
+    - name: pr-number
+      type: string
+      description: "PR number to clean up"
+    - name: container-registry-url
+      type: string
+  steps:
+    - name: cleanup-pr-images
+      image: {{ .Values.common_alpine_url }}
+      script: |
+        #!/bin/sh
+        echo "🧹 Cleaning up PR-$(params.pr-number) environment..."
+        
+        # PR 관련 이미지 정리 (선택사항)
+        echo "PR-$(params.pr-number) cleanup completed"
+        
+        # Slack 알림
+        apk add --no-cache curl
+        SLACK_WEBHOOK_URL="{{ .Values.slack_webhook_url }}"
+        SLACK_MESSAGE="🗑️ PR-$(params.pr-number) environment cleaned up"
+        curl -X POST -H 'Content-type: application/json' \
+        --data '{"text":"'"$SLACK_MESSAGE"'"}' \
+        $SLACK_WEBHOOK_URL

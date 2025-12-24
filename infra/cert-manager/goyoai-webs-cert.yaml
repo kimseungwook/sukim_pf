@@ -1,0 +1,37 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: goyoai-webs-tls
+  namespace: traefik
+spec:
+  secretName: goyoai-webs-tls
+  issuerRef:
+    name: goyoai-tools
+    kind: ClusterIssuer
+  dnsNames:
+    - gdauth.goyoai.com
+    - gdgr.goyoai.com
+    - gdno.goyoai.com
+    - gduk.goyoai.com
+    - gdtek.goyoai.com
+    - gdwaiserverdev.goyoai.com
+    - gdwbackdev.goyoai.com
+    - gdwbackportalschedulerdev.goyoai.com
+    - gdwbackportaldev.goyoai.com
+    - gdwfrontdev.goyoai.com
+    - gdhb.goyoai.com
+    - gdargo.goyoai.com
+    - gdrg.goyoai.com
+    - gdrc.goyoai.com
+    - rmstrg.bbrick.com
+    - rms.bbrick.com
+    - gdvt.goyoai.com
+    - gdbstrg.goyoai.comd
+    - gdbsptrg.goyoai.com
+    - gdfstrg.goyoai.com
+    - locust.goyoai.com
+    - gdfbackofficetrg.goyoai.com
+    - gdaifybacktrg.goyoai.com
+    - gdn8n.goyoai.com
+    - gdevstockweb.goyoai.com
+    - stock.bbrick.com
