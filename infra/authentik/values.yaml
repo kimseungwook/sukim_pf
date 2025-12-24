@@ -1,0 +1,63 @@
+global:
+  affinity: #{}
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: goyo-svc
+            operator: In
+            values:
+            - "deploy"
+authentik:
+  secret_key: "VkM0iJx7$ynzFLEPY8*0o^Vw9cK2jmRQ4CsTefgHIUu1OG6Np3"
+  error_reporting:
+    enabled: true
+  postgresql:
+    password: "YjNkYzdkMDM3Y2VlOWY2NTMxMmJiZWM0MGEyOTIzYmM="
+
+server:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: goyo-svc
+            operator: In
+            values:
+            - "deploy"
+worker:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: goyo-svc
+            operator: In
+            values:
+            - "deploy"            
+postgresql:
+  enabled: true
+  auth:
+    password: "YjNkYzdkMDM3Y2VlOWY2NTMxMmJiZWM0MGEyOTIzYmM="
+  primary:
+    affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: goyo-svc
+                operator: In
+                values:
+                - "deploy"
+redis:
+  enabled: true
+  master:
+    affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: goyo-svc
+                operator: In
+                values:
+                - "deploy"

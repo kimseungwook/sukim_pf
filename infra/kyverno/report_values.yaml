@@ -1,0 +1,245 @@
+# [User Custom + Slack/Loki/Grafana Integrated]
+
+fullnameOverride: policy-reporter
+replicaCount: 1
+
+# -----------------------------------------------------------------------------
+# 1. 기본 리소스 및 보안 설정
+# -----------------------------------------------------------------------------
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1234
+  fsGroup: 1234
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+
+rbac:
+  enabled: true
+
+# -----------------------------------------------------------------------------
+# 2. 타겟 설정 (Slack 알림 & Loki 로그)
+# -----------------------------------------------------------------------------
+target:
+  # 1) Slack: 중요한 알림만 받기
+  slack:
+    enabled: true
+    webhook: "https://hooks.slack.com/services/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" # 🔴 실제 Webhook URL 입력 필요
+    skipExistingOnStartup: true
+    minimumSeverity: "fail" # fail, error, critical 등급만 전송
+    filter:
+      status:
+        exclude: ["pass", "skip", "warn"] # 통과나 경고는 알림 제외
+  
+  # 2) Loki: 전체 감사 로그 저장
+  loki:
+    enabled: true
+    host: "http://goyo-loki-distributed-gateway.lgtm.svc.cluster.local:80"
+    minimumSeverity: "info" # 모든 정보 저장
+    skipExistingOnStartup: true
+    customFields:
+      cluster: "goyoai-dev" # 클러스터 식별자
+
+# -----------------------------------------------------------------------------
+# 3. 필터 설정 (데이터 수집 규칙)
+# -----------------------------------------------------------------------------
+reportFilter: {}
+
+sourceFilters:
+  # Kyverno: 시스템 NS 제외
+  - selector:
+      sources: [kyverno, KyvernoValidatingPolicy, KyvernoImageValidatingPolicy]
+    namespaces:
+      exclude:
+        - kube-system
+        - kube-public
+        - kube-node-lease
+    disableClusterReports: false
+   
+  # Trivy: goyoai-web 포함
+  - selector:
+      sources: 
+        - trivy-vulnerabilityreport
+        - trivy-configauditreport
+        - trivy-exposedsecretreport
+    namespaces:
+      include:
+        - goyoai-web
+    disableClusterReports: false
+
+worker: 5
+
+rest:
+  enabled: true
+
+metrics:
+  enabled: true
+  mode: detailed
+
+# -----------------------------------------------------------------------------
+# 4. 모니터링 설정 (Prometheus & Grafana)
+# -----------------------------------------------------------------------------
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: prometheus
+    honorLabels: true
+    interval: 30s
+    scrapeTimeout: 10s
+    labels:
+      release: goyo-prometheus-stack
+  
+  # [추가] Grafana 대시보드 자동 생성 (ConfigMap 방식)
+  grafana:
+    dashboards:
+      enabled: false
+      namespace: prometheus # 대시보드 ConfigMap이 생성될 위치
+
+# -----------------------------------------------------------------------------
+# 5. 플러그인 연결 (Core -> Plugin)
+# -----------------------------------------------------------------------------
+plugins:
+  trivy:
+    host: http://policy-reporter-trivy-plugin:8080
+    skipExistingOnStartup: false
+    sources:
+      - trivy-vulnerabilityreport
+      - trivy-configauditreport
+      - trivy-exposedsecretreport
+
+  kyverno:
+    host: http://policy-reporter-kyverno-plugin:8080
+
+# -----------------------------------------------------------------------------
+# 6. UI 설정
+# -----------------------------------------------------------------------------
+ui:
+  enabled: true
+  log:
+    level: debug
+   
+  ingress:
+    enabled: true
+    annotations:
+      nginx.ingress.kubernetes.io/rewrite-target: /$1
+    className: nginx
+    hosts:
+      - host: localhost
+        paths:
+        - path: "/ui/(.*)"
+          pathType: ImplementationSpecific
+
+  # UI -> Plugin 직접 연결
+  plugins:
+    kyverno:
+      host: http://policy-reporter-kyverno-plugin:8080
+    trivy:
+      host: http://policy-reporter-trivy-plugin:8080
+   
+  # 소스 ID 매핑
+  sources:
+    - name: kyverno
+      type: result
+      exceptions: false
+     
+    - name: trivy-vulnerabilityreport
+      type: severity
+      excludes:
+        results: [pass, error, skip]
+     
+    - name: trivy-configauditreport
+      type: severity
+      excludes:
+        results: [pass, error, skip]
+     
+    - name: trivy-exposedsecretreport
+      type: severity
+
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+   
+  service:
+    port: 8080
+    type: ClusterIP
+
+# -----------------------------------------------------------------------------
+# 7. 플러그인 배포 설정 (Trivy & Kyverno)
+# -----------------------------------------------------------------------------
+plugin:
+  kyverno:
+    enabled: true
+    replicaCount: 1
+    rbac:
+      enabled: true
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1234
+      fsGroup: 1234
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+      readOnlyRootFilesystem: true
+   
+  trivy:
+    enabled: true
+    replicaCount: 1
+    image:
+      registry: ghcr.io
+      repository: kyverno/policy-reporter/trivy-plugin
+      pullPolicy: IfNotPresent
+      tag: "0.4.11"
+    cli:
+      image:
+        registry: ghcr.io
+        repository: aquasecurity/trivy
+        pullPolicy: IfNotPresent
+        tag: "0.66.0"
+    rbac:
+      enabled: true
+    serviceAccount:
+      create: true
+      name: policy-reporter-trivy-plugin
+    resources:
+      limits:
+        cpu: 500m
+        memory: 1Gi
+      requests:
+        cpu: 100m
+        memory: 512Mi
+    skipExistingOnStartup: false
+    scanInterval: 60
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1234
+      fsGroup: 1234
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+      readOnlyRootFilesystem: true

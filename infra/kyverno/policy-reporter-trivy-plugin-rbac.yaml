@@ -1,0 +1,30 @@
+---
+# 1. ClusterRole: Trivy 리포트를 읽을 수 있는 권한 정의
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: policy-reporter-trivy-plugin-manual
+rules:
+  - apiGroups: ["aquasecurity.github.io"]
+    resources:
+      - vulnerabilityreports
+      - clustercompliancereports
+      - configauditreports
+      - exposedsecretreports
+      - infraassessmentreports
+      - rbacassessmentreports
+    verbs: ["get", "list", "watch"]
+---
+# 2. ClusterRoleBinding: 위 권한을 실제 플러그인 파드(ServiceAccount)에 연결
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: policy-reporter-trivy-plugin-manual-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: policy-reporter-trivy-plugin-manual
+subjects:
+  - kind: ServiceAccount
+    name: policy-reporter-trivy-plugin  # 중요: 실제 사용하는 SA 이름이어야 함
+    namespace: kyverno

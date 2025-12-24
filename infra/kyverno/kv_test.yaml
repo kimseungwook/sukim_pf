@@ -1,0 +1,14 @@
+# violation-test.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: violation-test
+  namespace: default
+  labels:
+    app: violation-test
+spec:
+  containers:
+  - name: nginx
+    image: docker.io/nginx:latest
+    securityContext:
+      privileged: true  # 대부분의 정책에서 차단됨

@@ -1,0 +1,16 @@
+server-side pull이 아닌 agent-side push 방식으로 설치이전에  loki가 설치되어 있어야함
+
+helm repo add grafana https://grafana.github.io/helm-charts
+helm upgrade --install goyo-promtail grafana/promtail -f lgtm/promtail/values.yaml -n promtail
+
+helm upgrade --install goyoai-backend-system-promtail grafana/promtail -f lgtm/promtail/backend-sytem-values.yaml -n promtail
+
+helm upgrade --install goyoai-backend-portal-promtail grafana/promtail -f lgtm/promtail/backend-portal-values.yaml -n promtail
+
+helm upgrade --install goyoai-ai-api-promtail grafana/promtail -f lgtm/promtail/ai-api-values.yaml -n promtail
+
+helm upgrade --install goyoai-ai-api-promtail grafana/promtail -f lgtm/promtail/ai-api-values.yaml -n promtail
+
+helm upgrade --install goyoai-backoffice-promtail grafana/promtail -f lgtm/promtail/backoffice-values.yaml -n promtail
+
+helm upgrade --install goyoai-aify-promtail grafana/promtail -f lgtm/promtail/aify-values.yaml -n promtail

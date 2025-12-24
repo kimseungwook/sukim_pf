@@ -1,0 +1,66 @@
+# ------------------------------------------------------------------
+# Kyverno Policy Values for ISMS-P Compliance
+# ------------------------------------------------------------------
+
+# [Policy Configuration]
+# Use 'baseline' as the foundation. It blocks known privilege escalations
+# but is less disruptive than 'restricted'.
+podSecurityStandard: baseline
+
+# [Validation Action]
+# 'Audit': Log violations but allow deployment (Recommended for initial setup).
+# Change to 'Enforce' later for critical policies.
+validationFailureAction: Audit
+
+# [ISMS-P Required Policies]
+# These distinct policies from the 'restricted' profile are crucial for compliance.
+# 1. require-run-as-non-root-user: Prevents running as UID 0.
+# 2. require-non-root-groups: Prevents running with GID 0.
+# 3. disallow-privilege-escalation: Prevents gain of more privileges than parent.
+includeRestrictedPolicies:
+  - require-run-as-non-root-user
+  - require-non-root-groups
+  - disallow-privilege-escalation
+
+# [Background Scanning]
+# Scan existing resources for violations.
+background: true
+
+# [Failure Policy]
+# 'Fail': Block deployments if Kyverno is down (Security First).
+failurePolicy: Fail
+
+# [Exasceptions / Whitelisting]
+# Exclude system and infrastructure namespaces from strict policies.
+policyExclude:
+  # Exception: System namespaces often require Root
+  require-run-as-non-root-user:
+    any:
+    - resources:
+        namespaces:
+        - kube-system
+        - kyverno
+        - monitoring # LGTM Stack (Loki, Grafana, Tempo, Mimir) runs here
+  
+  # Exception: System namespaces often require Root Groups
+  require-non-root-groups:
+    any:
+    - resources:
+        namespaces:
+        - kube-system
+        - kyverno
+        - monitoring
+
+  # Exception: Infrastructure components often need privilege escalation
+  disallow-privilege-escalation:
+    any:
+    - resources:
+        namespaces:
+        - kube-system
+        - kyverno
+        - monitoring
+
+# [Advanced: Per-Policy Enforcement]
+# You can selectively enforce policies while keeping others at 'Audit'
+validationFailureActionByPolicy: {}
+#  disallow-host-path: Enforce

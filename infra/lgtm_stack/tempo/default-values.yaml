@@ -1,0 +1,1378 @@
+global:
+  image:
+    registry: docker.io
+    pullSecrets: []
+  priorityClassName: null
+  clusterDomain: 'cluster.local'
+  dnsService: 'kube-dns'
+  dnsNamespace: 'kube-system'
+fullnameOverride: ''
+useExternalConfig: false
+configStorageType: ConfigMap
+externalConfigSecretName: '{{ include "tempo.resourceName" (dict "ctx" . "component" "config") }}'
+externalRuntimeConfigName: '{{ include "tempo.resourceName" (dict "ctx" . "component" "runtime") }}'
+externalConfigVersion: '0'
+reportingEnabled: true
+
+tempo:
+  image:
+    registry: docker.io
+    pullSecrets: []
+    repository: grafana/tempo
+    tag: null
+    pullPolicy: IfNotPresent
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: http-metrics
+    initialDelaySeconds: 30
+    timeoutSeconds: 1
+  podLabels: {}
+  podAnnotations: {}
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+  podSecurityContext:
+    fsGroup: 1000
+  structuredConfig: {}
+  memberlist:
+    appProtocol: null
+
+serviceAccount:
+  create: true
+  name: null
+  imagePullSecrets: []
+  annotations: {}
+  automountServiceAccountToken: false
+
+rbac:
+  create: false
+  pspEnabled: false
+
+ingester:
+  annotations: {}
+  replicas: 3
+  hostAliases: []
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 3
+    behavior: {}
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage:
+  image:
+    registry: null
+    pullSecrets: []
+    repository: null
+    tag: null
+  priorityClassName: null
+  podLabels: {}
+  podAnnotations: {}
+  extraArgs: []
+  extraEnv: []
+  extraEnvFrom: []
+  resources: {}
+  terminationGracePeriodSeconds: 300
+  topologySpreadConstraints: |
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          {{- include "tempo.selectorLabels" (dict "ctx" . "component" "ingester") | nindent 6 }}
+  affinity: |
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                {{- include "tempo.selectorLabels" (dict "ctx" . "component" "ingester") | nindent 12 }}
+            topologyKey: kubernetes.io/hostname
+        - weight: 75
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                {{- include "tempo.selectorLabels" (dict "ctx" . "component" "ingester") | nindent 12 }}
+            topologyKey: topology.kubernetes.io/zone
+  nodeSelector: {}
+  tolerations: []
+  extraVolumeMounts: []
+  extraVolumes: []
+  persistence:
+    enabled: false
+    inMemory: false
+    size: 10Gi
+    storageClass: null
+    annotations: {}
+  config:
+    replication_factor: 3
+    trace_idle_period: null
+    flush_check_period: null
+    max_block_bytes: null
+    max_block_duration: null
+    complete_block_timeout: null
+    flush_all_on_shutdown: false
+  service:
+    annotations: {}
+  appProtocol:
+    grpc: null
+
+metricsGenerator:
+  enabled: false
+  kind: Deployment
+  annotations: {}
+  replicas: 1
+  hostAliases: []
+  image:
+    registry: null
+    pullSecrets: []
+    repository: null
+    tag: null
+  priorityClassName: null
+  podLabels: {}
+  podAnnotations: {}
+  extraArgs: []
+  extraEnv: []
+  extraEnvFrom: []
+  resources: {}
+  terminationGracePeriodSeconds: 300
+  topologySpreadConstraints: |
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          {{- include "tempo.selectorLabels" (dict "ctx" . "component" "metrics-generator") | nindent 6 }}
+  # -- Affinity for metrics-generator pods. Passed through `tpl` and, thus, to be configured as string
+  # @default -- Hard node and soft zone anti-affinity
+  affinity: |
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              {{- include "tempo.selectorLabels" (dict "ctx" . "component" "metrics-generator") | nindent 10 }}
+          topologyKey: kubernetes.io/hostname
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                {{- include "tempo.selectorLabels" (dict "ctx" . "component" "metrics-generator") | nindent 12 }}
+            topologyKey: topology.kubernetes.io/zone
+  nodeSelector: {}
+  tolerations: []
+  persistence:
+    enabled: false
+    size: 10Gi
+    storageClass: null
+    annotations: {}
+  walEmptyDir: {}
+  extraVolumeMounts: []
+  extraVolumes: []
+  ports:
+    - name: grpc
+      port: 9095
+      service: true
+    - name: http-memberlist
+      port: 7946
+      service: false
+    - name: http-metrics
+      port: 3100
+      service: true
+  config:
+    registry:
+      collection_interval: 15s
+      external_labels: {}
+      stale_duration: 15m
+    processor:
+      service_graphs:
+        dimensions: []
+        histogram_buckets: [0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4, 12.8]
+        max_items: 10000
+        wait: 10s
+        workers: 10
+      span_metrics:
+        dimensions: []
+        histogram_buckets: [0.002, 0.004, 0.008, 0.016, 0.032, 0.064, 0.128, 0.256, 0.512, 1.02, 2.05, 4.10]
+    storage:
+      path: /var/tempo/wal
+      wal:
+      remote_write_flush_deadline: 1m
+      remote_write: []
+    traces_storage:
+      path: /var/tempo/traces
+    metrics_ingestion_time_range_slack: 30s
+  service:
+    annotations: {}
+  appProtocol:
+    grpc: null
+
+distributor:
+  replicas: 1
+  hostAliases: []
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    behavior: {}
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage:
+  image:
+    registry: null
+    pullSecrets: []
+    repository: null
+    tag: null
+  service:
+    annotations: {}
+    labels: {}
+    type: ClusterIP
+    loadBalancerIP: ''
+    loadBalancerSourceRanges: []
+  serviceDiscovery:
+    annotations: {}
+    labels: {}
+  priorityClassName: null
+  podLabels: {}
+  podAnnotations: {}
+  extraArgs: []
+  extraEnv: []
+  extraEnvFrom: []
+  resources: {}
+  terminationGracePeriodSeconds: 30
+  topologySpreadConstraints: |
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          {{- include "tempo.selectorLabels" (dict "ctx" . "component" "distributor") | nindent 6 }}
+  # -- Affinity for distributor pods. Passed through `tpl` and, thus, to be configured as string
+  # @default -- Hard node and soft zone anti-affinity
+  affinity: |
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              {{- include "tempo.selectorLabels" (dict "ctx" . "component" "distributor") | nindent 10 }}
+          topologyKey: kubernetes.io/hostname
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                {{- include "tempo.selectorLabels" (dict "ctx" . "component" "distributor") | nindent 12 }}
+            topologyKey: topology.kubernetes.io/zone
+  nodeSelector: {}
+  tolerations: []
+  extraVolumeMounts: []
+  extraVolumes: []
+  config:
+    log_received_traces: null
+    log_received_spans:
+      enabled: false
+      include_all_attributes: false
+      filter_by_status_error: false
+    extend_writes: null
+  appProtocol:
+    grpc: null
+
+compactor:
+  replicas: 1
+  hostAliases: []
+  image:
+    registry: null
+    pullSecrets: []
+    repository: null
+    tag: null
+  priorityClassName: null
+  podLabels: {}
+  podAnnotations: {}
+  extraArgs: []
+  extraEnv: []
+  extraEnvFrom: []
+  resources: {}
+  terminationGracePeriodSeconds: 30
+  nodeSelector: {}
+  tolerations: []
+  extraVolumeMounts: []
+  extraVolumes: []
+  config:
+    compaction:
+      block_retention: 48h
+      compacted_block_retention: 1h
+      compaction_window: 1h
+      v2_in_buffer_bytes: 5242880
+      v2_out_buffer_bytes: 20971520
+      max_compaction_objects: 6000000
+      max_block_bytes: 107374182400
+      retention_concurrency: 10
+      v2_prefetch_traces_count: 1000
+      max_time_per_tenant: 5m
+      compaction_cycle: 30s
+  service:
+    annotations: {}
+  dnsConfigOverides:
+    enabled: false
+    dnsConfig:
+      options:
+        - name: ndots
+          value: "3"
+
+querier:
+  replicas: 1
+  hostAliases: []
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    behavior: {}
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage:
+  image:
+    registry: null
+    pullSecrets: []
+    repository: null
+    tag: null
+  service:
+    annotations: {}
+  appProtocol:
+    grpc: null
+  priorityClassName: null
+  podLabels: {}
+  podAnnotations: {}
+  extraArgs: []
+  extraEnv: []
+  extraEnvFrom: []
+  resources: {}
+  terminationGracePeriodSeconds: 30
+  topologySpreadConstraints: |
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          {{- include "tempo.selectorLabels" (dict "ctx" . "component" "querier") | nindent 6 }}
+  # -- Affinity for querier pods. Passed through `tpl` and, thus, to be configured as string
+  # @default -- Hard node and soft zone anti-affinity
+  affinity: |
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              {{- include "tempo.selectorLabels" (dict "ctx" . "component" "querier" "memberlist" true) | nindent 10 }}
+          topologyKey: kubernetes.io/hostname
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                {{- include "tempo.selectorLabels" (dict "ctx" . "component" "querier" "memberlist" true) | nindent 12 }}
+            topologyKey: topology.kubernetes.io/zone
+  nodeSelector: {}
+  tolerations: []
+  extraVolumeMounts: []
+  extraVolumes: []
+  config:
+    frontend_worker:
+      frontend_address: '{{ include "tempo.resourceName" (dict "ctx" . "component" "query-frontend-discovery") }}:9095'
+      grpc_client_config: {}
+    trace_by_id:
+      query_timeout: 10s
+    search:
+      external_endpoints: []
+      query_timeout: 30s
+      prefer_self: 10
+      external_hedge_requests_at: 8s
+      external_hedge_requests_up_to: 2
+      external_backend: ""
+      google_cloud_run: {}
+    max_concurrent_queries: 20
+
+queryFrontend:
+  query:
+    enabled: false
+    image:
+      registry: null
+      pullSecrets: []
+      repository: grafana/tempo-query
+      tag: null
+    resources: {}
+    extraArgs: []
+    extraEnv: []
+    extraEnvFrom: []
+    extraVolumeMounts: []
+    extraVolumes: []
+    config: |
+      backend: 127.0.0.1:3100
+  replicas: 1
+  hostAliases: []
+  config:
+    max_outstanding_per_tenant: 2000
+    max_retries: 2
+    search:
+      concurrent_jobs: 1000
+      target_bytes_per_job: 104857600
+    trace_by_id:
+      query_shards: 50
+      hedge_requests_at: 2s
+      hedge_requests_up_to: 2
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    behavior: {}
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage:
+  image:
+    registry: null
+    pullSecrets: []
+    repository: null
+    tag: null
+  service:
+    port: 16686
+    annotations: {}
+    labels: {}
+    type: ClusterIP
+    loadBalancerIP: ""
+    loadBalancerSourceRanges: []
+  serviceDiscovery:
+    annotations: {}
+    labels: {}
+  ingress:
+    enabled: false
+    hosts:
+      - host: query.tempo.example.com
+        paths:
+          - path: /
+    tls:
+      - secretName: tempo-query-tls
+        hosts:
+          - query.tempo.example.com
+  priorityClassName: null
+  podLabels: {}
+  podAnnotations: {}
+  extraArgs: []
+  extraEnv: []
+  extraEnvFrom: []
+  resources: {}
+  terminationGracePeriodSeconds: 30
+  topologySpreadConstraints: |
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          {{- include "tempo.selectorLabels" (dict "ctx" . "component" "query-frontend") | nindent 6 }}
+  # -- Affinity for query-frontend pods. Passed through `tpl` and, thus, to be configured as string
+  # @default -- Hard node and soft zone anti-affinity
+  affinity: |
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              {{- include "tempo.selectorLabels" (dict "ctx" . "component" "query-frontend") | nindent 10 }}
+          topologyKey: kubernetes.io/hostname
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                {{- include "tempo.selectorLabels" (dict "ctx" . "component" "query-frontend") | nindent 12 }}
+            topologyKey: topology.kubernetes.io/zone
+  nodeSelector: {}
+  tolerations: []
+  extraVolumeMounts: []
+  extraVolumes: []
+  appProtocol:
+    grpc: null
+
+enterpriseFederationFrontend:
+  enabled: false
+  replicas: 1
+  hostAliases: []
+  proxy_targets: []
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage:
+  image:
+    registry: null
+    pullSecrets: []
+    repository: null
+    tag: null
+  service:
+    port: 3100
+    annotations: {}
+    type: ClusterIP
+    loadBalancerIP: ""
+    loadBalancerSourceRanges: []
+  priorityClassName: null
+  podLabels: {}
+  podAnnotations: {}
+  extraArgs: []
+  extraEnv: []
+  extraEnvFrom: []
+  resources: {}
+  terminationGracePeriodSeconds: 30
+  topologySpreadConstraints: |
+    - maxSkew: 1
+      topologyKey: failure-domain.beta.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          {{- include "tempo.selectorLabels" (dict "ctx" . "component" "federation-frontend") | nindent 6 }}
+  # -- Affinity for federation-frontend pods. Passed through `tpl` and, thus, to be configured as string
+  # @default -- Hard node and soft zone anti-affinity
+  affinity: |
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              {{- include "tempo.selectorLabels" (dict "ctx" . "component" "federation-frontend") | nindent 10 }}
+          topologyKey: kubernetes.io/hostname
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                {{- include "tempo.selectorLabels" (dict "ctx" . "component" "federation-frontend") | nindent 12 }}
+            topologyKey: failure-domain.beta.kubernetes.io/zone
+  nodeSelector: {}
+  tolerations: []
+  extraVolumeMounts: []
+  extraVolumes: []
+
+multitenancyEnabled: false
+
+traces:
+  jaeger:
+    grpc:
+      enabled: false
+      receiverConfig: {}
+    thriftBinary:
+      enabled: false
+      receiverConfig: {}
+    thriftCompact:
+      enabled: false
+      receiverConfig: {}
+    thriftHttp:
+      enabled: false
+      receiverConfig: {}
+  zipkin:
+    enabled: false
+    receiverConfig: {}
+  otlp:
+    http:
+      enabled: false
+      receiverConfig: {}
+    grpc:
+      enabled: false
+      receiverConfig: {}
+  opencensus:
+    enabled: false
+    receiverConfig: {}
+  kafka: {}
+
+memberlist:
+  node_name: ""
+  randomize_node_name: true
+  stream_timeout: "10s"
+  retransmit_factor: 2
+  pull_push_interval: "30s"
+  gossip_interval: "1s"
+  gossip_nodes: 2
+  gossip_to_dead_nodes_time: "30s"
+  min_join_backoff: "1s"
+  max_join_backoff: "1m"
+  max_join_retries: 10
+  abort_if_cluster_join_fails: false
+  rejoin_interval: "0s"
+  left_ingesters_timeout: "5m"
+  leave_timeout: "5s"
+  bind_addr: []
+  bind_port: 7946
+  packet_dial_timeout: "5s"
+  packet_write_timeout: "5s"
+
+config: |
+  multitenancy_enabled: {{ .Values.multitenancyEnabled }}
+
+  usage_report:
+    reporting_enabled: {{ .Values.reportingEnabled }}
+
+  {{- if .Values.enterprise.enabled }}
+  license:
+    path: "/license/license.jwt"
+
+  admin_api:
+    leader_election:
+      enabled: true
+      ring:
+        kvstore:
+          store: "memberlist"
+
+  auth:
+    type: enterprise
+
+  http_api_prefix: {{get .Values.tempo.structuredConfig "http_api_prefix"}}
+
+  admin_client:
+    storage:
+      backend: {{.Values.storage.admin.backend}}
+      {{- if eq .Values.storage.admin.backend "s3"}}
+      s3:
+        {{- toYaml .Values.storage.admin.s3 | nindent 6}}
+      {{- end}}
+      {{- if eq .Values.storage.admin.backend "gcs"}}
+      gcs:
+        {{- toYaml .Values.storage.admin.gcs | nindent 6}}
+      {{- end}}
+      {{- if eq .Values.storage.admin.backend "azure"}}
+      azure:
+        {{- toYaml .Values.storage.admin.azure | nindent 6}}
+      {{- end}}
+      {{- if eq .Values.storage.admin.backend "swift"}}
+      swift:
+        {{- toYaml .Values.storage.admin.swift | nindent 6}}
+      {{- end}}
+      {{- if eq .Values.storage.admin.backend "filesystem"}}
+      filesystem:
+        {{- toYaml .Values.storage.admin.filesystem | nindent 6}}
+      {{- end}}
+  {{- end }}
+
+  {{- if and .Values.enterprise.enabled .Values.enterpriseGateway.useDefaultProxyURLs }}
+  gateway:
+    proxy:
+      admin_api:
+        url: http://{{ template "tempo.fullname" . }}-admin-api.{{ .Release.Namespace }}.svc:{{ include "tempo.serverHttpListenPort" . }}
+      compactor:
+        url: http://{{ template "tempo.fullname" . }}-compactor.{{ .Release.Namespace }}.svc:{{ include "tempo.serverHttpListenPort" . }}
+      default:
+        url: http://{{ template "tempo.fullname" . }}-admin-api.{{ .Release.Namespace }}.svc:{{ include "tempo.serverHttpListenPort" . }}
+      distributor:
+        url: http://{{ template "tempo.fullname" . }}-distributor.{{ .Release.Namespace }}.svc:{{ include "tempo.serverHttpListenPort" . }}
+        otlp/grpc:
+          url: h2c://{{ template "tempo.fullname" . }}-distributor.{{ .Release.Namespace }}.svc:4317
+        otlp/http:
+          url: http://{{ template "tempo.fullname" . }}-distributor.{{ .Release.Namespace }}.svc:4318
+      ingester:
+        url: http://{{ template "tempo.fullname" . }}-ingester.{{ .Release.Namespace }}.svc:{{ include "tempo.serverHttpListenPort" . }}
+      querier:
+        url: http://{{ template "tempo.fullname" . }}-querier.{{ .Release.Namespace }}.svc:{{ include "tempo.serverHttpListenPort" . }}
+      query_frontend:
+        url: http://{{ template "tempo.fullname" . }}-query-frontend.{{ .Release.Namespace }}.svc:{{ include "tempo.serverHttpListenPort" . }}{{get .Values.tempo.structuredConfig "http_api_prefix"}}
+  {{else}}
+  {{- if and .Values.enterprise.enabled .Values.enterpriseGateway.proxy }}
+  gateway:
+    proxy: {{- toYaml .Values.enterpriseGateway.proxy | nindent 6 }}
+  {{- end }}
+  {{- end }}
+
+  compactor:
+    compaction:
+      block_retention: {{ .Values.compactor.config.compaction.block_retention }}
+      compacted_block_retention: {{ .Values.compactor.config.compaction.compacted_block_retention }}
+      compaction_window: {{ .Values.compactor.config.compaction.compaction_window }}
+      v2_in_buffer_bytes: {{ .Values.compactor.config.compaction.v2_in_buffer_bytes }}
+      v2_out_buffer_bytes: {{ .Values.compactor.config.compaction.v2_out_buffer_bytes }}
+      max_compaction_objects: {{ .Values.compactor.config.compaction.max_compaction_objects }}
+      max_block_bytes: {{ .Values.compactor.config.compaction.max_block_bytes }}
+      retention_concurrency: {{ .Values.compactor.config.compaction.retention_concurrency }}
+      v2_prefetch_traces_count: {{ .Values.compactor.config.compaction.v2_prefetch_traces_count }}
+      max_time_per_tenant: {{ .Values.compactor.config.compaction.max_time_per_tenant }}
+      compaction_cycle: {{ .Values.compactor.config.compaction.compaction_cycle }}
+    ring:
+      kvstore:
+        store: memberlist
+  {{- if and .Values.enterprise.enabled .Values.enterpriseFederationFrontend.enabled }}
+  federation:
+    proxy_targets:
+      {{- toYaml .Values.enterpriseFederationFrontend.proxy_targets | nindent 6 }}
+  {{- end }}
+  {{- if .Values.metricsGenerator.enabled }}
+  metrics_generator:
+    ring:
+      kvstore:
+        store: memberlist
+    processor:
+      {{- toYaml .Values.metricsGenerator.config.processor | nindent 6 }}
+    storage:
+      {{- toYaml .Values.metricsGenerator.config.storage | nindent 6 }}
+    traces_storage:
+      {{- toYaml .Values.metricsGenerator.config.traces_storage | nindent 6 }}
+    registry:
+      {{- toYaml .Values.metricsGenerator.config.registry | nindent 6 }}
+    metrics_ingestion_time_range_slack: {{ .Values.metricsGenerator.config.metrics_ingestion_time_range_slack }}
+  {{- end }}
+  distributor:
+    ring:
+      kvstore:
+        store: memberlist
+    receivers:
+      {{- if  or (.Values.traces.jaeger.thriftCompact.enabled) (.Values.traces.jaeger.thriftBinary.enabled) (.Values.traces.jaeger.thriftHttp.enabled) (.Values.traces.jaeger.grpc.enabled) }}
+      jaeger:
+        protocols:
+          {{- if .Values.traces.jaeger.thriftCompact.enabled }}
+          thrift_compact:
+            {{- $mergedJaegerThriftCompactConfig := mustMergeOverwrite (dict "endpoint" "0.0.0.0:6831") .Values.traces.jaeger.thriftCompact.receiverConfig }}
+            {{- toYaml $mergedJaegerThriftCompactConfig | nindent 10 }}
+          {{- end }}
+          {{- if .Values.traces.jaeger.thriftBinary.enabled }}
+          thrift_binary:
+            {{- $mergedJaegerThriftBinaryConfig := mustMergeOverwrite (dict "endpoint" "0.0.0.0:6832") .Values.traces.jaeger.thriftBinary.receiverConfig }}
+            {{- toYaml $mergedJaegerThriftBinaryConfig | nindent 10 }}
+          {{- end }}
+          {{- if .Values.traces.jaeger.thriftHttp.enabled }}
+          thrift_http:
+            {{- $mergedJaegerThriftHttpConfig := mustMergeOverwrite (dict "endpoint" "0.0.0.0:14268") .Values.traces.jaeger.thriftHttp.receiverConfig }}
+            {{- toYaml $mergedJaegerThriftHttpConfig | nindent 10 }}
+          {{- end }}
+          {{- if .Values.traces.jaeger.grpc.enabled }}
+          grpc:
+            {{- $mergedJaegerGrpcConfig := mustMergeOverwrite (dict "endpoint" "0.0.0.0:14250") .Values.traces.jaeger.grpc.receiverConfig }}
+            {{- toYaml $mergedJaegerGrpcConfig | nindent 10 }}
+          {{- end }}
+      {{- end }}
+      {{- if .Values.traces.zipkin.enabled }}
+      zipkin:
+        {{- $mergedZipkinReceiverConfig := mustMergeOverwrite (dict "endpoint" "0.0.0.0:9411") .Values.traces.zipkin.receiverConfig }}
+        {{- toYaml $mergedZipkinReceiverConfig | nindent 6 }}
+      {{- end }}
+      {{- if or (.Values.traces.otlp.http.enabled) (.Values.traces.otlp.grpc.enabled) }}
+      otlp:
+        protocols:
+          {{- if .Values.traces.otlp.http.enabled }}
+          http:
+            {{- $mergedOtlpHttpReceiverConfig := mustMergeOverwrite (dict "endpoint" "0.0.0.0:4318") .Values.traces.otlp.http.receiverConfig }}
+            {{- toYaml $mergedOtlpHttpReceiverConfig | nindent 10 }}
+          {{- end }}
+          {{- if .Values.traces.otlp.grpc.enabled }}
+          grpc:
+            {{- $mergedOtlpGrpcReceiverConfig := mustMergeOverwrite (dict "endpoint" "0.0.0.0:4317") .Values.traces.otlp.grpc.receiverConfig }}
+            {{- toYaml $mergedOtlpGrpcReceiverConfig | nindent 10 }}
+          {{- end }}
+      {{- end }}
+      {{- if .Values.traces.opencensus.enabled }}
+      opencensus:
+        {{- $mergedOpencensusReceiverConfig := mustMergeOverwrite (dict "endpoint" "0.0.0.0:55678") .Values.traces.opencensus.receiverConfig }}
+        {{- toYaml $mergedOpencensusReceiverConfig | nindent 6 }}
+      {{- end }}
+      {{- if .Values.traces.kafka }}
+      kafka:
+        {{- toYaml .Values.traces.kafka | nindent 6 }}
+      {{- end }}
+    {{- if or .Values.distributor.config.log_received_traces .Values.distributor.config.log_received_spans.enabled }}
+    log_received_spans:
+      enabled: {{ or .Values.distributor.config.log_received_traces .Values.distributor.config.log_received_spans.enabled }}
+      include_all_attributes: {{ .Values.distributor.config.log_received_spans.include_all_attributes }}
+      filter_by_status_error: {{ .Values.distributor.config.log_received_spans.filter_by_status_error }}
+    {{- end }}
+    {{- if .Values.distributor.config.extend_writes }}
+    extend_writes: {{ .Values.distributor.config.extend_writes }}
+    {{- end }}
+  querier:
+    frontend_worker:
+      frontend_address: {{ include "tempo.resourceName" (dict "ctx" . "component" "query-frontend-discovery") }}:9095
+      {{- if .Values.querier.config.frontend_worker.grpc_client_config }}
+      grpc_client_config:
+        {{- toYaml .Values.querier.config.frontend_worker.grpc_client_config | nindent 6 }}
+      {{- end }}
+    trace_by_id:
+      query_timeout: {{ .Values.querier.config.trace_by_id.query_timeout }}
+    search:
+      external_endpoints: {{- toYaml .Values.querier.config.search.external_endpoints | nindent 6 }}
+      query_timeout: {{ .Values.querier.config.search.query_timeout }}
+      prefer_self: {{ .Values.querier.config.search.prefer_self }}
+      external_hedge_requests_at: {{ .Values.querier.config.search.external_hedge_requests_at }}
+      external_hedge_requests_up_to: {{ .Values.querier.config.search.external_hedge_requests_up_to }}
+      external_backend: {{ .Values.querier.config.search.external_backend }}
+      {{- if .Values.querier.config.search.google_cloud_run }}
+      google_cloud_run:
+        {{- toYaml .Values.querier.config.search.google_cloud_run | nindent 6 }}
+      {{- end }}
+    max_concurrent_queries: {{ .Values.querier.config.max_concurrent_queries }}
+  query_frontend:
+    max_outstanding_per_tenant: {{ .Values.queryFrontend.config.max_outstanding_per_tenant }}
+    max_retries: {{ .Values.queryFrontend.config.max_retries }}
+    search:
+      target_bytes_per_job: {{ .Values.queryFrontend.config.search.target_bytes_per_job }}
+      concurrent_jobs: {{ .Values.queryFrontend.config.search.concurrent_jobs }}
+    trace_by_id:
+      query_shards: {{ .Values.queryFrontend.config.trace_by_id.query_shards }}
+      hedge_requests_at: {{ .Values.queryFrontend.config.trace_by_id.hedge_requests_at }}
+      hedge_requests_up_to: {{ .Values.queryFrontend.config.trace_by_id.hedge_requests_up_to }}
+
+  ingester:
+    lifecycler:
+      ring:
+        replication_factor: {{ .Values.ingester.config.replication_factor }}
+        kvstore:
+          store: memberlist
+      tokens_file_path: /var/tempo/tokens.json
+    {{- if .Values.ingester.config.trace_idle_period }}
+    trace_idle_period: {{ .Values.ingester.config.trace_idle_period }}
+    {{- end }}
+    {{- if .Values.ingester.config.flush_check_period }}
+    flush_check_period: {{ .Values.ingester.config.flush_check_period }}
+    {{- end }}
+    {{- if .Values.ingester.config.max_block_bytes }}
+    max_block_bytes: {{ .Values.ingester.config.max_block_bytes }}
+    {{- end }}
+    {{- if .Values.ingester.config.max_block_duration }}
+    max_block_duration: {{ .Values.ingester.config.max_block_duration }}
+    {{- end }}
+    {{- if .Values.ingester.config.complete_block_timeout }}
+    complete_block_timeout: {{ .Values.ingester.config.complete_block_timeout }}
+    {{- end }}
+    {{- if .Values.ingester.config.flush_all_on_shutdown }}
+    flush_all_on_shutdown: {{ .Values.ingester.config.flush_all_on_shutdown }}
+    {{- end }}
+  memberlist:
+    {{- with .Values.memberlist }}
+      {{- toYaml . | nindent 2 }}
+    {{- end }}
+    join_members:
+      - dns+{{ include "tempo.fullname" . }}-gossip-ring:{{ .Values.memberlist.bind_port }}
+  overrides:
+    {{- toYaml .Values.global_overrides | nindent 2 }}
+  server:
+    http_listen_port: {{ .Values.server.httpListenPort }}
+    log_level: {{ .Values.server.logLevel }}
+    log_format: {{ .Values.server.logFormat }}
+    grpc_server_max_recv_msg_size: {{ .Values.server.grpc_server_max_recv_msg_size }}
+    grpc_server_max_send_msg_size: {{ .Values.server.grpc_server_max_send_msg_size }}
+    http_server_read_timeout: {{ .Values.server.http_server_read_timeout }}
+    http_server_write_timeout: {{ .Values.server.http_server_write_timeout }}
+  storage:
+    trace:
+      {{- if .Values.storage.trace.block.version }}
+      block:
+        version: {{.Values.storage.trace.block.version}}
+        {{- if .Values.storage.trace.block.dedicated_columns}}
+        parquet_dedicated_columns:
+          {{ .Values.storage.trace.block.dedicated_columns | toYaml | nindent 8}}
+        {{- end }}
+      {{- end }}
+      pool:
+        max_workers: {{ .Values.storage.trace.pool.max_workers }}
+        queue_depth: {{ .Values.storage.trace.pool.queue_depth }}
+      backend: {{.Values.storage.trace.backend}}
+      {{- if eq .Values.storage.trace.backend "s3"}}
+      s3:
+        {{- toYaml .Values.storage.trace.s3 | nindent 6}}
+      {{- end }}
+      {{- if eq .Values.storage.trace.backend "gcs"}}
+      gcs:
+        {{- toYaml .Values.storage.trace.gcs | nindent 6}}
+      {{- end }}
+      {{- if eq .Values.storage.trace.backend "azure"}}
+      azure:
+        {{- toYaml .Values.storage.trace.azure | nindent 6}}
+      {{- end }}
+      blocklist_poll: 5m
+      local:
+        path: /var/tempo/traces
+      wal:
+        path: /var/tempo/wal
+      {{- if .Values.memcached.enabled }}
+      cache: memcached
+      memcached:
+        consistent_hash: true
+        host: {{ include "tempo.fullname" . }}-memcached
+        service: memcached-client
+        timeout: 500ms
+      {{- end }}
+server:
+  # --  HTTP server listen host
+  httpListenPort: 3100
+  # -- Log level. Can be set to trace, debug, info (default), warn, error, fatal, panic
+  logLevel: info
+  # -- Log format. Can be set to logfmt (default) or json.
+  logFormat: logfmt
+  # -- Max gRPC message size that can be received
+  grpc_server_max_recv_msg_size: 4194304
+  # -- Max gRPC message size that can be sent
+  grpc_server_max_send_msg_size: 4194304
+  # -- Read timeout for HTTP server
+  http_server_read_timeout: 30s
+  # -- Write timeout for HTTP server
+  http_server_write_timeout: 30s
+
+# To configure a different storage backend instead of local storage:
+# storage:
+#   trace:
+#     backend: azure
+#     azure:
+#       container_name:
+#       storage_account_name:
+#       storage_account_key:
+storage:
+  trace:
+    # Settings for the block storage backend and buckets.
+    block:
+      # -- The supported block versions are specified here https://grafana.com/docs/tempo/latest/configuration/parquet/
+      version: null
+      # -- Lis with dedicated attribute columns (only for vParquet3 or later)
+      dedicated_columns: []
+    # -- The supported storage backends are gcs, s3 and azure, as specified in https://grafana.com/docs/tempo/latest/configuration/#storage
+    backend: local
+    # The worker pool is used primarily when finding traces by id, but is also used by other.
+    pool:
+      # -- Total number of workers pulling jobs from the queue
+      max_workers: 400
+      # -- Length of job queue. imporatant for querier as it queues a job for every block it has to search
+      queue_depth: 20000
+  # Settings for the Admin client storage backend and buckets. Only valid is enterprise.enabled is true.
+  admin:
+    # -- The supported storage backends are gcs, s3 and azure, as specified in https://grafana.com/docs/enterprise-traces/latest/config/reference/#admin_client_config
+    backend: filesystem
+
+global_overrides:
+  per_tenant_override_config: /runtime-config/overrides.yaml
+overrides: |
+  overrides: {}
+memcached:
+  enabled: true
+  image:
+    registry: null
+    pullSecrets: []
+    repository: memcached
+    tag: 1.6.23-alpine
+    pullPolicy: IfNotPresent
+  host: memcached
+  replicas: 1
+  extraArgs: []
+  extraEnv: []
+  extraEnvFrom: []
+  podLabels: {}
+  podAnnotations: {}
+  resources: {}
+  topologySpreadConstraints: |
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+          {{- include "tempo.selectorLabels" (dict "ctx" . "component" "memcached") | nindent 6 }}
+  # -- Affinity for memcached pods. Passed through `tpl` and, thus, to be configured as string
+  # @default -- Hard node and soft zone anti-affinity
+  affinity: |
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              {{- include "tempo.selectorLabels" (dict "ctx" . "component" "memcached") | nindent 10 }}
+          topologyKey: kubernetes.io/hostname
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                {{- include "tempo.selectorLabels" (dict "ctx" . "component" "memcached") | nindent 12 }}
+            topologyKey: topology.kubernetes.io/zone
+  service:
+    annotations: {}
+memcachedExporter:
+  enabled: false
+  hostAliases: []
+  image:
+    registry: null
+    pullSecrets: []
+    repository: prom/memcached-exporter
+    tag: v0.8.0
+    pullPolicy: IfNotPresent
+  resources: {}
+metaMonitoring:
+  serviceMonitor:
+    enabled: false
+    namespace: null
+    namespaceSelector: {}
+    annotations: {}
+    labels: {}
+    interval: null
+    scrapeTimeout: null
+    relabelings: []
+    metricRelabelings: []
+    scheme: http
+    tlsConfig: null
+  grafanaAgent:
+    enabled: false
+    installOperator: false
+    logs:
+      remote:
+        url: ''
+        auth:
+          tenantId: ''
+          username: ''
+          passwordSecretName: ''
+          passwordSecretKey: ''
+      additionalClientConfigs: []
+    metrics:
+      remote:
+        url: ''
+        headers: {}
+        auth:
+          username: ''
+          passwordSecretName: ''
+          passwordSecretKey: ''
+      additionalRemoteWriteConfigs: []
+      scrapeK8s:
+        enabled: true
+        kubeStateMetrics:
+          namespace: kube-system
+          labelSelectors:
+            app.kubernetes.io/name: kube-state-metrics
+    namespace: ''
+    labels: {}
+    annotations: {}
+prometheusRule:
+  enabled: false
+  namespace: null
+  annotations: {}
+  labels: {}
+  groups: []
+minio:
+  enabled: false
+  mode: standalone
+  rootUser: grafana-tempo
+  rootPassword: supersecret
+  buckets:
+    - name: tempo-traces
+      policy: none
+      purge: false
+    - name: enterprise-traces
+      policy: none
+      purge: false
+    - name: enterprise-traces-admin
+      policy: none
+      purge: false
+  persistence:
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  configPathmc: '/tmp/minio/mc/'
+gateway:
+  enabled: false
+  replicas: 1
+  hostAliases: []
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+    behavior: {}
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: null
+  verboseLogging: true
+  image:
+    registry: null
+    pullSecrets: []
+    repository: nginxinc/nginx-unprivileged
+    tag: 1.19-alpine
+    pullPolicy: IfNotPresent
+  priorityClassName: null
+  podLabels: {}
+  podAnnotations: {}
+  extraArgs: []
+  extraEnv: []
+  extraEnvFrom: []
+  extraVolumes: []
+  extraVolumeMounts: []
+  resources: {}
+  terminationGracePeriodSeconds: 30
+  topologySpreadConstraints: |
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+  affinity: |
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+          topologyKey: kubernetes.io/hostname
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+            topologyKey: topology.kubernetes.io/zone
+  nodeSelector: {}
+  tolerations: []
+  service:
+    port: 80
+    type: ClusterIP
+    clusterIP: null
+    nodePort: null
+    loadBalancerIP: null
+    annotations: {}
+    labels: {}
+    additionalPorts: {}
+  ingress:
+    enabled: false
+    annotations: {}
+    hosts:
+      - host: gateway.tempo.example.com
+        paths:
+          - path: /
+    tls:
+      - secretName: tempo-gateway-tls
+        hosts:
+          - gateway.tempo.example.com
+  basicAuth:
+    enabled: false
+    username: null
+    password: null
+    htpasswd: >-
+      {{ htpasswd (required "'gateway.basicAuth.username' is required" .Values.gateway.basicAuth.username) (required "'gateway.basicAuth.password' is required" .Values.gateway.basicAuth.password) }}
+    existingSecret: null
+  readinessProbe:
+    httpGet:
+      path: /
+      port: http-metrics
+    initialDelaySeconds: 15
+    timeoutSeconds: 1
+  nginxConfig:
+    logFormat: |-
+      main '$remote_addr - $remote_user [$time_local]  $status '
+              '"$request" $body_bytes_sent "$http_referer" '
+              '"$http_user_agent" "$http_x_forwarded_for"';
+    serverSnippet: ''
+    httpSnippet: ''
+    resolver: ''
+    file: |
+      worker_processes  5;  ## Default: 1
+      error_log  /dev/stderr;
+      pid        /tmp/nginx.pid;
+      worker_rlimit_nofile 8192;
+
+      events {
+        worker_connections  4096;  ## Default: 1024
+      }
+
+      http {
+        client_body_temp_path /tmp/client_temp;
+        proxy_temp_path       /tmp/proxy_temp_path;
+        fastcgi_temp_path     /tmp/fastcgi_temp;
+        uwsgi_temp_path       /tmp/uwsgi_temp;
+        scgi_temp_path        /tmp/scgi_temp;
+
+        proxy_http_version    1.1;
+
+        default_type application/octet-stream;
+        log_format   {{ .Values.gateway.nginxConfig.logFormat }}
+
+        access_log   /dev/stderr  main;
+
+        sendfile     on;
+        tcp_nopush   on;
+
+        resolver {{ .Values.global.dnsService }}.{{ .Values.global.dnsNamespace }}.svc.{{ .Values.global.clusterDomain }};
+
+        server {
+          listen             8080;
+
+          location = / {
+            return 200 'OK';
+            auth_basic off;
+          }
+
+          location = /jaeger/api/traces {
+            proxy_pass       http://{{ include "tempo.resourceName" (dict "ctx" . "component" "distributor") }}.{{ .Release.Namespace }}.svc.{{ .Values.global.clusterDomain }}:14268/api/traces;
+          }
+
+          location = /zipkin/spans {
+            proxy_pass       http://{{ include "tempo.resourceName" (dict "ctx" . "component" "distributor") }}.{{ .Release.Namespace }}.svc.{{ .Values.global.clusterDomain }}:9411/spans;
+          }
+
+          location = /v1/traces {
+            proxy_pass       http://{{ include "tempo.resourceName" (dict "ctx" . "component" "distributor") }}.{{ .Release.Namespace }}.svc.{{ .Values.global.clusterDomain }}:4318/v1/traces;
+          }
+
+          location ^~ /api {
+            proxy_pass       http://{{ include "tempo.resourceName" (dict "ctx" . "component" "query-frontend") }}.{{ .Release.Namespace }}.svc.{{ .Values.global.clusterDomain }}:3100$request_uri;
+          }
+
+          location = /flush {
+            proxy_pass       http://{{ include "tempo.resourceName" (dict "ctx" . "component" "ingester") }}.{{ .Release.Namespace }}.svc.{{ .Values.global.clusterDomain }}:3100$request_uri;
+          }
+
+          location = /shutdown {
+            proxy_pass       http://{{ include "tempo.resourceName" (dict "ctx" . "component" "ingester") }}.{{ .Release.Namespace }}.svc.{{ .Values.global.clusterDomain }}:3100$request_uri;
+          }
+
+          location = /distributor/ring {
+            proxy_pass       http://{{ include "tempo.resourceName" (dict "ctx" . "component" "distributor") }}.{{ .Release.Namespace }}.svc.{{ .Values.global.clusterDomain }}:3100$request_uri;
+          }
+
+          location = /ingester/ring {
+            proxy_pass       http://{{ include "tempo.resourceName" (dict "ctx" . "component" "distributor") }}.{{ .Release.Namespace }}.svc.{{ .Values.global.clusterDomain }}:3100$request_uri;
+          }
+
+          location = /compactor/ring {
+            proxy_pass       http://{{ include "tempo.resourceName" (dict "ctx" . "component" "compactor") }}.{{ .Release.Namespace }}.svc.{{ .Values.global.clusterDomain }}:3100$request_uri;
+          }
+        }
+      }
+enterprise:
+  enabled: false
+  image:
+    repository: grafana/enterprise-traces
+    tag: v2.3.2
+license:
+  contents: 'NOTAVALIDLICENSE'
+  external: false
+  secretName: '{{ include "tempo.resourceName" (dict "ctx" . "component" "license") }}'
+tokengenJob:
+  enable: true
+  hostAliases: []
+  extraArgs: {}
+  env: []
+  extraEnvFrom: []
+  annotations: {}
+  initContainers: []
+  containerSecurityContext:
+    readOnlyRootFilesystem: true
+adminApi:
+  replicas: 1
+  hostAliases: []
+  annotations: {}
+  service:
+    annotations: {}
+    labels: {}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  podLabels: {}
+  podAnnotations: {}
+  nodeSelector: {}
+  topologySpreadConstraints: |
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+  affinity: |
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+            topologyKey: kubernetes.io/hostname
+        - weight: 75
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+            topologyKey: topology.kubernetes.io/zone
+  podDisruptionBudget: {}
+  securityContext: {}
+  containerSecurityContext:
+    readOnlyRootFilesystem: true
+  extraArgs: {}
+  persistence:
+    subPath: ''
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: http-metrics
+    initialDelaySeconds: 45
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+  terminationGracePeriodSeconds: 60
+  tolerations: []
+  extraContainers: []
+  extraVolumes: []
+  extraVolumeMounts: []
+  env: []
+  extraEnvFrom: []
+enterpriseGateway:
+  useDefaultProxyURLs: true
+  proxy: {}
+  replicas: 1
+  hostAliases: []
+  annotations: {}
+  service:
+    annotations: {}
+    labels: {}
+    port: null
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  podLabels: {}
+  podAnnotations: {}
+  podDisruptionBudget: {}
+  nodeSelector: {}
+  topologySpreadConstraints: |
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+      labelSelector:
+        matchLabels:
+  affinity: |
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+            topologyKey: kubernetes.io/hostname
+        - weight: 75
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+            topologyKey: topology.kubernetes.io/zone
+  securityContext: {}
+  containerSecurityContext:
+    readOnlyRootFilesystem: true
+  initContainers: []
+  extraArgs: {}
+  persistence:
+    subPath: ''
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: http-metrics
+    initialDelaySeconds: 45
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+  terminationGracePeriodSeconds: 60
+  tolerations: []
+  extraContainers: []
+  extraVolumes: []
+  extraVolumeMounts: []
+  env: []
+  extraEnvFrom: []
+  ingress:
+    enabled: false
+    annotations: {}
+    hosts:
+      - host: gateway.gem.example.com
+        paths:
+          - path: /
+    tls:
+      - secretName: gem-gateway-tls
+        hosts:
+          - gateway.gem.example.com
+extraObjects: []
+

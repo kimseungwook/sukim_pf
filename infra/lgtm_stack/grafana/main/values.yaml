@@ -1,0 +1,89 @@
+global:
+  imagePullSecrets: []
+
+rbac:
+  create: true
+  pspEnabled: false
+
+serviceAccount:
+  create: true
+  automountServiceAccountToken: true
+
+replicas: 1
+
+image:
+  registry: docker.io
+  repository: grafana/grafana
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+    - name: dockerhub-secret
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 472
+  runAsGroup: 472
+  fsGroup: 472
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+
+createConfigmap: true
+
+service:
+  enabled: true
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+grafana.ini:
+  paths:
+    data: /var/lib/grafana/
+    logs: /var/log/grafana
+    plugins: /var/lib/grafana/plugins
+    provisioning: /etc/grafana/provisioning
+  analytics:
+    check_for_updates: true
+  auth:
+    signout_redirect_url: "https://gpauth.goyoai.io/application/o/grafana/end-session/"
+    oauth_auto_login: true
+  auth.generic_oauth:
+    name: authentik
+    enabled: true
+    client_id: "E61uEoFnfQBoVFd0cHvX2F2m72GEP6qwh5WtYoDL"
+    # client_secret: "cdNCe2IcE2oYdkhed6M6amAAJhR34CKpZ3dd2UJZD9ROtSG62qnaXjJmjce5MzMfYNyZKLc8uQOwZFxPprXUnN022UyFcHYYBHlQBp3adx7Kx3KbqAy6I8eOyLHAN0JJ"
+    scopes: "openid profile email"
+    auth_url: "https://gpauth.goyoai.io/application/o/authorize/"
+    token_url: "https://gpauth.goyoai.io/application/o/token/"
+    api_url: "https://gpauth.goyoai.io/application/o/userinfo/"
+    role_attribute_path: contains(groups, 'Grafana Admins') && 'Admin' || contains(groups, 'Grafana Editors') && 'Editor' || 'Viewer'
+  server:
+    domain: "gpgr.goyoai.io"
+    root_url: "https://gpgr.goyoai.io/"
+nodeSelector:
+  service: "monitoring"
+
+tolerations: #[]
+- key: "goyo-svc"
+  operator: "Equal"
+  value: "monitoring"
+  effect: "NoSchedule"
+
+affinity: #{}
+
+persistence:
+  enabled: true
+
+sidecar:
+  dashboards:
+    enabled: false
+  datasources:
+    enabled: false
+
+networkPolicy:
+  enabled: false
+
+# The remaining default values are omitted for brevity, add them here if necessary.

@@ -1,0 +1,105 @@
+# goyo_prd/lgtm/promtail/values.yaml
+global:
+  storageClass: "oci-bv"
+serviceAccount:
+  create: true
+rbac:
+  create: true
+daemonset:
+  enabled: true
+service:
+  enabled: true
+nodeSelector:
+  goyo-svc: "backoffice"
+  
+nodeAffinity:
+  requiredDuringSchedulingIgnoredDuringExecution:
+    nodeSelectorTerms:
+    - matchExpressions:
+      - key: "goyo-svc"
+        operator: In
+        values:
+        - "backoffice"
+    
+tolerations:
+  - key: "goyo-svc"
+    operator: "Equal"
+    value: "backoffice"
+    effect: "NoSchedule"
+config:
+  clients:
+    - url: http://goyo-loki-distributed-gateway.monitoring.svc.cluster.local:80/loki/api/v1/push
+  positions:
+    filename: /run/promtail/positions.yaml
+    
+  snippets:
+    pipelineStages:
+      # 1. CRI 로그 파싱
+      - cri: {}
+      
+      # 2. 타임스탬프 파싱
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      
+      # 3. 트레이스 정보 추출 ([traceId,spanId] 패턴)
+      - regex:
+          expression: '\[(?P<traceId>[a-f0-9]{16,32})\s+(?P<spanId>[a-f0-9]{16,32})\]'
+          source: output
+      - labels:
+          traceId:
+          spanId:
+      
+      # 4. 로그 레벨 추출
+      - regex:
+          expression: '^\d{2}:\d{2}:\d{2}\.\d{3}\s+(DEBUG|INFO|WARN|ERROR|FATAL)\s+'
+          source: output
+      - labels:
+          level: 
+      
+      # 5. 에러 로그 구분 (🚨 이모지)
+      - regex:
+          expression: '^🚨.*'
+          source: output
+      - labels:
+          error_flag: "true"
+          
+  scrape_configs:
+    - job_name: kubernetes-pods
+      kubernetes_sd_configs:
+        - role: pod
+      # snippets의 pipelineStages가 여기에 자동 적용됨 (중복 제거)
+      relabel_configs:
+        # 기본 쿠버네티스 레이블
+        - source_labels: [__meta_kubernetes_namespace]
+          target_label: namespace
+        - source_labels: [__meta_kubernetes_pod_name]
+          target_label: pod
+        - source_labels: [__meta_kubernetes_pod_container_name]
+          target_label: container
+        - source_labels: [__meta_kubernetes_pod_node_name]
+          target_label: node
+          
+        # Spring Boot 애플리케이션 특화 레이블
+        - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+          target_label: service_name
+        - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_instance]
+          target_label: service_instance
+          
+        # 모든 pod 레이블을 Loki 레이블로 매핑
+        - action: labelmap
+          regex: __meta_kubernetes_pod_label_(.+)
+          
+        # 로그 파일 경로 설정
+        - action: replace
+          source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
+          separator: /
+          target_label: __path__
+          replacement: /var/log/pods/*$1/*.log
+          
+        # goyoai 관련 pod만 수집
+        - source_labels: [__meta_kubernetes_pod_label_name]
+          regex: '.*goyoai.*'
+          action: keep
+networkPolicy:
+  enabled: false

@@ -1,0 +1,48 @@
+# =============================================================================
+# Policy Reporter - Trivy CRD 접근 권한
+# Helm Chart가 지원하지 않는 추가 RBAC 규칙
+# =============================================================================
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: policy-reporter-trivy-access
+  labels:
+    app.kubernetes.io/name: policy-reporter
+    app.kubernetes.io/component: reporting
+    app.kubernetes.io/managed-by: manual
+rules:
+- apiGroups:
+  - aquasecurity.github.io
+  resources:
+  - vulnerabilityreports
+  - vulnerabilityreports/status
+  - configauditreports
+  - configauditreports/status
+  - exposedsecretreports
+  - exposedsecretreports/status
+  - clustercompliancereports
+  - clustercompliancereports/status
+  - clustervulnerabilityreports
+  - clustervulnerabilityreports/status
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: policy-reporter-trivy-access
+  labels:
+    app.kubernetes.io/name: policy-reporter
+    app.kubernetes.io/component: reporting
+    app.kubernetes.io/managed-by: manual
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: policy-reporter-trivy-access
+subjects:
+- kind: ServiceAccount
+  name: policy-reporter
+  namespace: kyverno

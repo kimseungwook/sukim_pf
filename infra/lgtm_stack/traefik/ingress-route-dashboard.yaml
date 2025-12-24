@@ -1,0 +1,17 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: hyper-report-frontend-web-ingressroute
+  namespace: hyper-repor # 또는 해당 서비스가 위치한 네임스페이스
+spec:
+  entryPoints:
+    - web # 이는 Traefik의 엔트리 포인트를 참조합니다. 해당 설정에 맞게 조정해야 합니다.
+    - websecure
+  routes:
+    - kind: Rule
+      match:  Host(`tekton.bbrick.com`) && PathPrefix(`/`)  # Specify the desired path
+      services:
+        - name: hyper-report-frontend-web
+          namespace: hyper-repor  # Ensure this is the namespace where your service is located
+          port: 5000
+  # 필요한 경우, 해당 요청에 대한 Traefik 미들웨어를 여기에 정의할 수 있습니다.

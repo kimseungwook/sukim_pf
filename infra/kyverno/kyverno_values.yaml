@@ -1,0 +1,101 @@
+# 1. CRD 설치
+crds:
+  install: true
+
+# 2. Admission Controller (핵심)
+admissionController:
+  replicas: 1
+  resources:
+    limits:
+      memory: 384Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  
+  # [모니터링 추가] ServiceMonitor 활성화
+  serviceMonitor:
+    enabled: true
+    # Prometheus Operator가 ServiceMonitor를 감지할 수 있도록 네임스페이스 지정
+    # (일반적으로 Prometheus가 설치된 네임스페이스나, Operator가 감시하는 네임스페이스)
+    namespace: "prometheus" 
+    interval: 30s
+    # 만약 Prometheus Operator가 특정 라벨이 있는 ServiceMonitor만 수집한다면 아래 주석 해제 후 설정
+    additionalLabels: 
+      release: prometheus-stack
+
+# 3. Background Controller
+backgroundController:
+  replicas: 1
+  resources:
+    limits:
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+  
+  # [모니터링 추가]
+  serviceMonitor:
+    enabled: true
+    namespace: "prometheus"
+    interval: 30s
+    additionalLabels: 
+      release: prometheus-stack
+
+# 4. Cleanup Controller
+cleanupController:
+  replicas: 1
+  resources:
+    limits:
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+  
+  # [모니터링 추가]
+  serviceMonitor:
+    enabled: true
+    namespace: "prometheus"
+    interval: 30s
+    additionalLabels: 
+      release: prometheus-stack
+
+# 5. Reports Controller
+reportsController:
+  replicas: 1
+  resources:
+    limits:
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+  
+  # [모니터링 추가]
+  serviceMonitor:
+    enabled: true
+    namespace: "prometheus"
+    interval: 30s
+    additionalLabels: 
+      release: prometheus-stack
+
+# 6. 기능 활성화
+features:
+  admissionReports:
+    enabled: true
+  backgroundScan:
+    enabled: true
+    backgroundScanInterval: 1h
+  policyReports:
+    enabled: true
+
+# 7. 구성 및 예외 처리
+config:
+  excludeKyvernoNamespace: true
+  resourceFilters:
+    - '[*,kube-system,*]'
+    - '[*,kube-public,*]'
+    - '[*,kube-node-lease,*]'
+    - '[Node,*,*]'
+    - '[APIService,*,*]'
+    - '[TokenReview,*,*]'
+    - '[SubjectAccessReview,*,*]'
+    - '[SelfSubjectAccessReview,*,*]'

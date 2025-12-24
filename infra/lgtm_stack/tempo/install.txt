@@ -1,0 +1,2 @@
+helm repo add grafana https://grafana.github.io/helm-charts
+helm upgrade --install goyo-tempo-distributed grafana/tempo-distributed -f lgtm/tempo/values.yaml -n monitoring
