@@ -1,0 +1,86 @@
+mode: daemonset
+
+service:
+  enabled: true
+  type: ClusterIP
+
+config:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318  # Assuming you want to keep HTTP receiver as well
+    prometheus:
+        config:
+          scrape_configs:
+          - job_name: " goyoai-web"
+            scrape_interval: 5s
+            metrics_path: "/actuator/prometheus"
+            static_configs:
+            - targets:
+              - goyoai-backend-system-actuator.goyoai-web.svc.cluster.local:9292
+
+  exporters:
+    logging:
+      loglevel: debug
+    otlp:
+      endpoint: goyo-tempo-distributed-distributor.monitoring.svc.cluster.local:4317  # Updated to Tempo's gRPC endpoint
+      tls:
+        insecure: true  # Ensure this matches your environment's security configuration
+    prometheus:
+        endpoint: goyo-prometheus-stack-kube-prometheus.prometheus.svc.cluster.local:9090
+        const_labels:
+          label1: goyoai-web
+    prometheusremotewrite:
+        endpoint: "http://goyo-mimir-distributed-gateway.monitoring.svc:80/api/v1/push"
+        tls:
+          insecure: true
+  processors:
+    batch:
+      timeout: 5s
+      send_batch_size: 1024
+
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [batch]
+        exporters: [logging, otlp]
+
+serviceAccount:
+  create: true
+
+tolerations:  
+  - key: "goyo-svc"
+    operator: "Equal"
+    value: "back"
+    effect: "NoSchedule"  
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: "goyo-svc"
+          operator: In
+          values:
+          - "back"
+
+ports:
+  otlp:
+    enabled: true
+    containerPort: 4317  # gRPC
+    servicePort: 4317
+    protocol: TCP
+  otlp-http:
+    enabled: true
+    containerPort: 4318  # HTTP
+    servicePort: 4318
+    protocol: TCP
+  metrics:
+    enabled: true
+
+serviceMonitor:
+  enabled: true

@@ -1,33 +1,8 @@
-# vault-serviceaccount.yaml
-# apiVersion: v1
-# kind: ServiceAccount
-# metadata:
-#   name: goyoai-vault-sa
-#   namespace: vault
-#   labels:
-#     app: gointern
-#     purpose: vault-authentication
-# ---
-# apiVersion: rbac.authorization.k8s.io/v1
-# kind: ClusterRoleBinding
-# metadata:
-#   name: goyoai-vault-auth
-#   labels:
-#     app: gointern-vault
-# roleRef:
-#   apiGroup: rbac.authorization.k8s.io
-#   kind: ClusterRole
-#   name: system:auth-delegator
-# subjects:
-# - kind: ServiceAccount
-#   name: goyoai-vault-sa
-#   namespace: vault
-# ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: goyoai-vault-sa
-  namespace: goyoai-web
+  name: vault-sa
+  namespace: sukim-web
   labels:
-    app: gointern
+    app: vault
     purpose: vault-authentication

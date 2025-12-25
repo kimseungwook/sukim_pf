@@ -1,0 +1,16 @@
+helm repo add opentelemetry-helm https://open-telemetry.github.io/opentelemetry-helm-charts
+helm upgrade --install goyo-otlp opentelemetry-helm/opentelemetry-collector --version 0.85.0 -f otel-collector/values.yaml -n otlp
+
+
+helm upgrade --install backend-system-oltp opentelemetry-helm/opentelemetry-collector -f otel-collector/backend-system-values.yaml -n otlp
+
+----
+helm upgrade --install backend-portal-oltp opentelemetry-helm/opentelemetry-collector -f otel-collector/backend-portal-values.yaml -n otlp
+
+
+------otel-gointern-------
+helm upgrade --install gointern-oltp opentelemetry-helm/opentelemetry-collector -f otel-collector/gointern-otel-values.yaml -n otlp
+
+
+------otel-aify-------
+helm upgrade --install aify-oltp opentelemetry-helm/opentelemetry-collector -f otel-collector/aify-otel-values.yaml -n otlp

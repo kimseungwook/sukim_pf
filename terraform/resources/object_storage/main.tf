@@ -26,3 +26,12 @@ resource "oci_objectstorage_bucket" "mimir_bucket" {
 
   object_events_enabled = false
 }
+resource "oci_objectstorage_bucket" "harbor_bucket" {
+  namespace      = var.namespace
+  compartment_id = var.compartment_ocid
+  name           = "harbor-bucket-sukim"
+  storage_tier   = "Standard"
+  access_type    = "NoPublicAccess"
+
+  object_events_enabled = false
+}

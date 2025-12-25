@@ -1,10 +1,26 @@
-Unseal Key 1: h9Pts7MnMMhQokCvt904ELUx4EKo6gPXYuseP8C4KYlT
-Unseal Key 2: z2UL53d6Y1EX9Su0FQ1lkK39qqxAKyfKCtHKqO+HK4eA
-Unseal Key 3: fFNgIJuYuw77pB+RQBBcRUK6YopkE/FRSbBsWXZLqae3
-Unseal Key 4: itg3BRwW0YaXarJfC0BDCvt3LBXRtLfsWb6rZUPtQHlV
-Unseal Key 5: /WMZARBNPirpj8IsEhkZLMyCTIcs57DYkIxTQiZsAnHF
-
-Initial Root Token: hvs.XSHNPneF6Cea4Qcxa34B8Q51
+{
+  "unseal_keys_b64": [
+    "itOzWIBgvtNvTTKkxifEGX0iLQf2TwdWZxruXqOEyiGe",
+    "1emBqUJ8ct9u+CdfvwRkiTXx/6bsQGVlon93RzN/JD37",
+    "ZdThH5PFeh39oaN1fdbIHaSDokrBhQzGn2bb0xZ6/LTz",
+    "KyFDMqAyL3nxeFutP4ha9WJlHvY8wt6/VW1mf2I6EQ7R",
+    "BkzBRU3Hzc5nAEg4dnKJvGEEUuHC53fBqaOqlgvHct3r"
+  ],
+  "unseal_keys_hex": [
+    "8ad3b3588060bed36f4d32a4c627c4197d222d07f64f0756671aee5ea384ca219e",
+    "d5e981a9427c72df6ef8275fbf04648935f1ffa6ec406565a27f7747337f243dfb",
+    "65d4e11f93c57a1dfda1a3757dd6c81da483a24ac1850cc69f66dbd3167afcb4f3",
+    "2b214332a0322f79f1785bad3f885af562651ef63cc2debf556d667f623a110ed1",
+    "064cc1454dc7cdce67004838767289bc610452e1c2e777c1a9a3aa960bc772ddeb"
+  ],
+  "unseal_shares": 5,
+  "unseal_threshold": 3,
+  "recovery_keys_b64": [],
+  "recovery_keys_hex": [],
+  "recovery_keys_shares": 0,
+  "recovery_keys_threshold": 0,
+  "root_token": "hvs.Bg4EsAE3hMisQRYpwfE3xytZ"
+}
 
 vault write auth/oidc/config \
 oidc_discovery_url="https://gdauth.goyoai.com/application/o/vault/" \

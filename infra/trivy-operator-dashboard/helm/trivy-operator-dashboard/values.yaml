@@ -4,7 +4,7 @@ logging:
 
 kubernetes:
   kubeConfigFileName: "" # path to custom kube config file. in k8s it should be empty
-  namespaceList: "goyoai-web" # a list of namespaces, comma delimited
+  namespaceList: "sukim-web" # a list of namespaces, comma delimited
   trivyUseClusterRbacAssessmentReport: true # (in)activate Cluster RBAC Assessment Reports
   trivyUseConfigAuditReport: true # (in)activate Config Audit Reports
   trivyUseExposedSecretReport: true # (in)activate Exposed Secret Reports
@@ -121,13 +121,16 @@ readinessProbe:
     port: http
   periodSeconds: 30
 
-nodeSelector:
-  goyo-svc: amd64
-
-tolerations:
-  - key: "goyo-svc"
-    operator: "Equal"
-    value: "amd64"
-    effect: "NoSchedule"
-
-affinity: {}
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: service
+              operator: In
+              values:
+                - tools
+            - key: node.kubernetes.io/instance-type
+              operator: In
+              values:
+                - VM.Standard.E5.Flex

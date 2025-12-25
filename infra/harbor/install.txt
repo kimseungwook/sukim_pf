@@ -1,3 +1,25 @@
 helm repo add harbor https://helm.goharbor.io
 
-helm upgrade --install goyo-harbor harbor/harbor -f harbor/values.yaml -n harbor
+# 1. Secret 생성 (먼저 실행)
+kubectl create namespace harbor
+kubectl apply -f harbor/secret.yaml
+
+# 2. Harbor 설치
+helm upgrade --install harbor harbor/harbor \
+  --version 1.18.1 \
+  -f harbor/values.yaml \
+  -n harbor
+
+# 3. 설치 확인
+kubectl get pods -n harbor
+kubectl get ingress -n harbor
+
+# 4. 업그레이드
+helm upgrade harbor harbor/harbor \
+  --version 1.18.1 \
+  -f harbor/values.yaml \
+  -n harbor
+
+# 5. 삭제 (필요시)
+helm uninstall harbor -n harbor
+kubectl delete pvc -n harbor --all

@@ -2,8 +2,8 @@
 # Trivy Operator - Enhanced Configuration
 
 # ===== 스캔 대상 네임스페이스 =====
-targetNamespaces: "goyoai-web,argocd,kyverno,falco,trivy,vault,authentik"
-excludeNamespaces: "kube-system,kube-public,kube-node-lease,prometheus,cert-manager,monitoring,logging,harbor,tekton-pipelines,ingress-nginx,default,rms,keda"
+targetNamespaces: "sukim-web,argocd,kyverno,falco,trivy,vault,authentik"
+excludeNamespaces: "kube-system,kube-public,kube-node-lease,prometheus,cert-manager,monitoring,harbor,tekton-pipelines,default"
 
 # ===== 이미지 설정 =====
 image:
@@ -44,7 +44,7 @@ operator:
   scannerReportTTL: "24h"
   
   privateRegistryScanSecretsNames:
-    "gdhb.goyoai.com": "harbor-registry-secret"
+    "harbor.8ai.store": "harbor-registry-secret"
   
   accessGlobalSecretsAndServiceAccount: true
 
@@ -77,7 +77,7 @@ trivyOperator:
   additionalReportLabels: ""
   
   # [핵심!] 사이드카 이미지 제외 - comma-separated string!
-  excludeImages: "gdhb.goyoai.com/common/promtail:*,*/promtail:*,grafana/promtail:*,gdhb.goyoai.com/common/vault:*,*/vault:*,hashicorp/vault:*,curlimages/curl:8.4.0"
+  excludeImages: "harbor.8ai.store/common/promtail:*,*/promtail:*,grafana/promtail:*,harbor.8ai.store/common/vault:*,*/vault:*,hashicorp/vault:*,curlimages/curl:8.4.0"
 
 # ===== Trivy 스캐너 설정 =====
 trivy:

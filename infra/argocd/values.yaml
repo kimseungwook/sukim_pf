@@ -1,16 +1,16 @@
 global:
+  domain: gdargo.go-intern.io
+  
   nodeSelector:
-    goyo-svc: deploy
-
-  # tolerations:
-  #   - key: "goyo-svc"
-  #     operator: "Equal"
-  #     value: "deploy"
-  #     effect: "NoSchedule"
+    service: tools  # 최신 표준에 맞춤 (goyo-svc -> service)
+    # kubernetes.io/os: linux 는 기본값이므로 생략
 
 configs:
   cm:
+    # ArgoCD URL 설정
     url: https://gdargo.go-intern.io
+    
+    # Dex OIDC Authentik 연동 설정
     dex.config: |
       connectors:
       - type: oidc
@@ -27,10 +27,12 @@ configs:
             - profile
             - email
             - groups
+  
   params:
+    # Insecure 모드 활성화 (HTTP 사용)
     server.insecure: "true"
     dexserver.disable.tls: "true"
-    server.dex.server: "http://goyo-argocd-dex-server:5556"
+    server.dex.server: "http://argocd-dex-server:5556"  # 서비스명 업데이트
 
   rbac:
     policy.csv: |
@@ -44,44 +46,122 @@ configs:
       p, role:dev-team, projects, get, *, allow
       p, role:dev-team, repositories, get, *, allow
 
-      # 레이블 기반 접근 제어 (올바른 문법)
-      p, role:dev-team, applications, action/get, team/dev-team, allow
-      p, role:dev-team, applications, action/sync, team/dev-team, allow
+      # 레이블 기반 접근 제어
+      p, role:dev-team, applications, get, team/dev-team, allow
+      p, role:dev-team, applications, sync, team/dev-team, allow
 
+# 공통 설정 anchor
 commonSettings: &commonSettings
   nodeSelector:
-    goyo-svc: deploy
+    service: tools
 
 server:
+  # Server insecure 모드 (HTTP)
   extraArgs:
     - --insecure
+  
   <<: *commonSettings
+  
+  # Authentik URL 해석용 hosts alias
   hostAliases:
     - ip: "10.96.151.83"
       hostnames:
         - "gdauth.go-intern.io"
         - "gdargo.go-intern.io"
+  
+  # Prometheus metrics 활성화
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: prometheus-stack
 
+# Redis (ArgoCD v9.x는 redis-ha 또는 external redis 권장, 기본 redis 사용)
 redis:
   <<: *commonSettings
+  
+  # Redis metrics 활성화
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: prometheus-stack
 
+# Application Controller
 controller:
   <<: *commonSettings
+  
+  # Controller metrics 활성화
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: prometheus-stack
+    # PrometheusRule (실제 rule spec이 필요하므로 비활성화)
+    rules:
+      enabled: false
+      additionalLabels:
+        release: prometheus-stack
 
+# Dex (OIDC Provider)
 dex:
   enabled: true
   <<: *commonSettings
+  
+  # Authentik OIDC Issuer 해석용 hosts alias
   hostAliases:
     - ip: "10.96.151.83"
       hostnames:
         - "gdauth.go-intern.io"
         - "gdargo.go-intern.io"
+  
+  # Dex metrics 활성화
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: prometheus-stack
 
+# Repo Server
 repoServer:
   <<: *commonSettings
+  
+  # Repo Server metrics 활성화
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: prometheus-stack
 
+# ApplicationSet Controller
 applicationSet:
   <<: *commonSettings
+  
+  # ApplicationSet metrics 활성화
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: prometheus-stack
 
+# Notifications Controller
 notifications:
   <<: *commonSettings
+  
+  # Notifications metrics 활성화
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: prometheus-stack
+
+# Commit Server (v9.x 신규 기능, 기본 비활성화)
+commitServer:
+  enabled: false

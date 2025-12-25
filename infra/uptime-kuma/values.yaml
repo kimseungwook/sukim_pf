@@ -1,6 +1,6 @@
 image:
   repository: docker.io/louislam/uptime-kuma
-  tag: "1.23.13-debian"
+  tag: "2.0.2"
 
 service:
   type: ClusterIP
@@ -45,9 +45,4 @@ podEnv:
     value: "3001"
 
 nodeSelector:
-  goyo-svc: monitoring
-tolerations:
-  - key: "goyo-svc"
-    operator: "Equal"
-    value: "monitoring"
-    effect: "NoSchedule"
+  service: tools

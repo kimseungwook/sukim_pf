@@ -1,3 +1,0 @@
-docker build -t gdhb.goyoai.com/common/kubectl:alpine-3.22.2 -f ./harbor/kubectl/Dockerfile .
-
-docker push gdhb.goyoai.com/common/kubectl:alpine-3.22.2   

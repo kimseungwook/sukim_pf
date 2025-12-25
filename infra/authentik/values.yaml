@@ -139,11 +139,15 @@ worker:
 postgresql:
   enabled: true
 
-  # 공식 PostgreSQL 이미지 사용 (Bitnami 대신)
+  # Bitnami PostgreSQL 이미지 사용 (Chart 호환성 및 권한 문제 해결)
   image:
     registry: docker.io
-    repository: library/postgres
-    tag: "17.0-bookworm"
+    repository: bitnamilegacy/postgresql
+    tag: "17.6.0-debian-12-r4"
+
+  # 권한 문제 해결을 위한 Init Container 활성화
+  volumePermissions:
+    enabled: true
 
   auth:
     username: authentik
@@ -159,12 +163,34 @@ postgresql:
     affinity:
       <<: *common-node-affinity
 
+    # Recovery를 위한 Probe 설정 완화
+    startupProbe:
+      enabled: true
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 60
+      successThreshold: 1
+
+    livenessProbe:
+      enabled: true
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 15
+      successThreshold: 1
+
+    readinessProbe:
+      enabled: true
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 15
+      successThreshold: 1
+
     # PostgreSQL 설정
-    args:
-      - -c
-      - config_file=/bitnami/postgresql/conf/postgresql.conf
-      - -c
-      - hba_file=/bitnami/postgresql/conf/pg_hba.conf
+    # 기본 차트의 args가 Bitnami 이미지와 충돌하므로 제거 (자동 설정 사용)
+    args: []
 
     configuration: |
       listen_addresses = '*'

@@ -1,3 +1,3 @@
 helm repo add hashicorp https://helm.releases.hashicorp.com
 
-helm upgrade --install goyo-vault hashicorp/vault  -f vault/values.yaml -n vault
+helm upgrade --install vault hashicorp/vault --version 0.31.0 -f vault/values.yaml -n vault
