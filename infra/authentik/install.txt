@@ -30,10 +30,12 @@ helm upgrade --install authentik-valkey oci://registry-1.docker.io/bitnamicharts
 kubectl get pods -n authentik -l app.kubernetes.io/name=valkey
 
 # -----------------------------------------------------------------------------
-# Step 5: Authentik 설치
+# Step 5: Authentik 설치 (2025.8.4 - 안정 버전)
 # -----------------------------------------------------------------------------
+# 주의: 2025.10.3 버전은 Worker OOMKilled 버그로 인해 사용 불가
 helm upgrade --install authentik authentik/authentik \
-  -f values.yaml \
+  -f authentik/values.yaml \
+  --version 2025.8.4 \
   -n authentik
 
 # -----------------------------------------------------------------------------
