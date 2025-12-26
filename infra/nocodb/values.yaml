@@ -11,19 +11,54 @@
 
 image:
   # -- image repository
-  repository: nocodb/nocodb
+  repository: docker.io/nocodb/nocodb
   # -- image pull policy
   pullPolicy: IfNotPresent
   # -- image tag
   # @default -- chart.appVersion
-  tag: 0.264.4
+  tag: 0.264.9
 
-env: #{}
+env:
+  # NocoDB Database Connection - 템플릿 방식
   NC_DB: 'pg://{{ include "common.names.fullname" . }}-postgresql:5432?u={{ .Values.postgresql.auth.username }}&p={{ .Values.postgresql.auth.password }}&d={{ .Values.postgresql.auth.database }}'
   # NC_REDIS_URL: 'redis://nocodb-redis-master.redis.svc.cluster.local:6379/0'
 
-#  NC_DB: 'pg://{{ include "common.names.fullname" . }}-postgresql:5432?u={{ .Values.postgresql.auth.username }}&p={{ .Values.postgresql.auth.password }}&d={{ .Values.postgresql.auth.database }}'
+# Security Context (Kyverno Policy 준수)
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
 
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false  # NocoDB는 /tmp 쓰기 필요
+
+# Probes 설정 (시작 시간 증가)
+probes:
+  startup:
+    enabled: true
+    spec:
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 30
+  liveness:
+    enabled: true
+    spec:
+      initialDelaySeconds: 60
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+  readiness:
+    enabled: true
+    spec:
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
 
 # -- Configures service settings for the chart.
 # @default -- See values.yaml
@@ -44,10 +79,10 @@ affinity: #{}
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
       - matchExpressions:
-        - key: "goyo-svc"
+        - key: "service"
           operator: In
           values:
-          - "sentryAMD64"
+          - "tools"
 
 persistence:
   # -- Configure persistence for data to use sqlite backend.
@@ -61,23 +96,15 @@ persistence:
       enabled: false
     storageClassName: oci-bv
 
-# PostgreSQL Database Configuration
+# PostgreSQL Database Configuration (별도 설치)
 postgresql:
-  # Whether to deploy the postgresql chart with this chart. If disabled, make sure PostgreSQL is available at the hostname below and credentials are configured below
-  enabled: true
-
+  # Subchart는 지원 중단 - PostgreSQL을 별도로 설치해야 함
+  enabled: false
+  
+  # 별도 설치된 PostgreSQL 접속 정보
   auth:
     postgresPassword: nocodb
     username: nocodb
-    # password: cjiUrkhU1GFSO/IfGvo55n+5k6DjMk9zi40AkoQej2X30Kux
     password: nocodb
     database: nocodb
 
-  architecture: standalone
-  primary:
-    persistence:
-      enabled: false
-      size: 100Mi
-      accessModes:
-        - ReadWriteOnce
-      storageClassName: oci-bv

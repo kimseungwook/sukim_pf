@@ -288,8 +288,8 @@ postgresql:
     resourcesPreset: "none"
   passwordUpdateJob:
     resourcesPreset: "none"
-  volumePermissions:
-    resourcesPreset: "none"
+  # volumePermissions:
+  #   resourcesPreset: "none"
   metrics:
     resourcesPreset: "none"
 

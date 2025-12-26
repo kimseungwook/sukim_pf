@@ -1,0 +1,85 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: nocodb-pg
+  namespace: cloudnative-pg
+spec:
+  # PostgreSQL 인스턴스 수 (고가용성)
+  instances: 2
+  
+  # PostgreSQL 버전
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.2
+  
+  # Bootstrap
+  bootstrap:
+    initdb:
+      database: nocodb
+      owner: nocodb
+      secret:
+        name: nocodb-pg-app
+  
+  # Superuser Secret
+  superuserSecret:
+    name: nocodb-pg-superuser
+  
+  # Storage
+  storage:
+    storageClass: oci-bv
+    size: 10Gi
+  
+  # Resources
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  
+  # Node Affinity
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: service
+                operator: In
+                values:
+                  - tools
+  
+  # PostgreSQL Configuration
+  postgresql:
+    parameters:
+      max_connections: "200"
+      shared_buffers: "256MB"
+      effective_cache_size: "768MB"
+      maintenance_work_mem: "64MB"
+      checkpoint_completion_target: "0.9"
+      wal_buffers: "16MB"
+      default_statistics_target: "100"
+      random_page_cost: "1.1"
+      effective_io_concurrency: "200"
+      work_mem: "2621kB"
+      min_wal_size: "1GB"
+      max_wal_size: "4GB"
+  
+  # Monitoring
+  monitoring:
+    enabled: true
+    podMonitorEnabled: true
+  
+  # Backup (선택사항)
+  # backup:
+  #   barmanObjectStore:
+  #     destinationPath: s3://my-bucket/backup
+  #     s3Credentials:
+  #       accessKeyId:
+  #         name: backup-credentials
+  #         key: ACCESS_KEY_ID
+  #       secretAccessKey:
+  #         name: backup-credentials
+  #         key: SECRET_ACCESS_KEY
+  #     wal:
+  #       compression: gzip
+  #   retentionPolicy: "30d"

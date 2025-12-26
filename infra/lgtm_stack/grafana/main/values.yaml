@@ -79,9 +79,19 @@ persistence:
 
 sidecar:
   dashboards:
-    enabled: false
+    enabled: true  # ✅ 자동 대시보드 로드
+    label: grafana_dashboard
+    labelValue: "1"
+    searchNamespace: ALL  # 모든 namespace 검색
+    folder: /tmp/dashboards
+    folderAnnotation: grafana_folder
+    provider:
+      foldersFromFilesStructure: true
   datasources:
-    enabled: false
+    enabled: true  # ✅ 자동 데이터소스 로드
+    label: grafana_datasource
+    labelValue: "1"
+    searchNamespace: ALL
 
 networkPolicy:
   enabled: false

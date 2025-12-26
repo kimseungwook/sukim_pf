@@ -22,3 +22,9 @@ override.tf.json
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
+
+# Kubernetes sensitive files
+**/secret.yaml
+**/secrets.yaml
+**/env-secret.yaml
+**/pg-secrets.yaml

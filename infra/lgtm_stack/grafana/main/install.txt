@@ -1,3 +1,3 @@
 helm repo add grafana https://grafana.github.io/helm-charts
 
-helm upgrade --install goyo-grafana grafana/grafana -f lgtm/grafana/values.yaml -n monitoring
+helm upgrade --install grafana grafana/grafana -f lgtm_stack/grafana/main/values.yaml -n monitoring

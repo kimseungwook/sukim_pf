@@ -1,0 +1,207 @@
+# =============================================================================
+# cert-manager Installation Guide
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Step 1: Namespace 생성
+# -----------------------------------------------------------------------------
+kubectl create namespace cert-manager
+
+# -----------------------------------------------------------------------------
+# Step 2: Helm Repository 추가 및 업데이트
+# -----------------------------------------------------------------------------
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+
+# -----------------------------------------------------------------------------
+# Step 3: cert-manager CRD 설치 (Helm으로 설치하지 않는 경우)
+# -----------------------------------------------------------------------------
+# CRD를 Helm과 별도로 관리하려면 아래 명령어 사용
+# kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.2/cert-manager.crds.yaml
+
+# 또는 Helm values.yaml에서 crds.enabled=true로 설정 (권장)
+
+# -----------------------------------------------------------------------------
+# Step 4: cert-manager 설치
+# -----------------------------------------------------------------------------
+helm upgrade --install cert-manager jetstack/cert-manager \
+  -f values.yaml \
+  -n cert-manager \
+  --version v1.16.2
+
+# -----------------------------------------------------------------------------
+# Step 5: 설치 확인
+# -----------------------------------------------------------------------------
+# Pod 상태 확인
+kubectl get pods -n cert-manager
+
+# CRD 확인
+kubectl get crd | grep cert-manager
+
+# cert-manager API 확인
+kubectl get certificaterequest,certificate,clusterissuer,issuer -A
+
+# -----------------------------------------------------------------------------
+# Step 6: ClusterIssuer 생성 (Let's Encrypt)
+# -----------------------------------------------------------------------------
+# Let's Encrypt Staging (테스트용)
+cat <<EOF | kubectl apply -f -
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    # Let's Encrypt Staging 서버 (테스트용)
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: your-email@example.com  # 수정 필요
+    privateKeySecretRef:
+      name: letsencrypt-staging
+    solvers:
+    - http01:
+        ingress:
+          class: traefik
+EOF
+
+# Let's Encrypt Production (운영용)
+cat <<EOF | kubectl apply -f -
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    # Let's Encrypt Production 서버
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: your-email@example.com  # 수정 필요
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: traefik
+EOF
+
+# -----------------------------------------------------------------------------
+# Step 7: 인증서 발급 테스트
+# -----------------------------------------------------------------------------
+# 테스트용 Certificate 생성
+cat <<EOF | kubectl apply -f -
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: test-certificate
+  namespace: default
+spec:
+  secretName: test-tls
+  issuerRef:
+    name: letsencrypt-staging
+    kind: ClusterIssuer
+  dnsNames:
+  - test.example.com  # 수정 필요
+EOF
+
+# Certificate 상태 확인
+kubectl describe certificate test-certificate -n default
+
+# CertificateRequest 확인
+kubectl get certificaterequest -n default
+
+# 생성된 Secret 확인
+kubectl get secret test-tls -n default
+
+# -----------------------------------------------------------------------------
+# Troubleshooting
+# -----------------------------------------------------------------------------
+# Controller 로그 확인
+kubectl logs -n cert-manager -l app.kubernetes.io/component=controller
+
+# Webhook 로그 확인
+kubectl logs -n cert-manager -l app.kubernetes.io/component=webhook
+
+# CAInjector 로그 확인
+kubectl logs -n cert-manager -l app.kubernetes.io/component=cainjector
+
+# Certificate 상세 정보
+kubectl describe certificate <certificate-name> -n <namespace>
+
+# CertificateRequest 상세 정보
+kubectl describe certificaterequest <request-name> -n <namespace>
+
+# Challenge 확인 (ACME)
+kubectl get challenge -A
+
+# Order 확인 (ACME)
+kubectl get order -A
+
+# -----------------------------------------------------------------------------
+# 업그레이드
+# -----------------------------------------------------------------------------
+# CRD 업그레이드 (Helm으로 관리하지 않는 경우)
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.2/cert-manager.crds.yaml
+
+# Helm chart 업그레이드
+helm repo update
+helm upgrade cert-manager jetstack/cert-manager \
+  -f values.yaml \
+  -n cert-manager \
+  --version v1.16.2
+
+# -----------------------------------------------------------------------------
+# 삭제
+# -----------------------------------------------------------------------------
+# Certificate 및 ClusterIssuer 먼저 삭제
+kubectl delete certificate --all -A
+kubectl delete clusterissuer --all
+
+# Helm uninstall
+helm uninstall cert-manager -n cert-manager
+
+# CRD 삭제 (선택사항 - 모든 Certificate 리소스도 함께 삭제됨)
+kubectl delete crd certificates.cert-manager.io
+kubectl delete crd certificaterequests.cert-manager.io
+kubectl delete crd challenges.acme.cert-manager.io
+kubectl delete crd clusterissuers.cert-manager.io
+kubectl delete crd issuers.cert-manager.io
+kubectl delete crd orders.acme.cert-manager.io
+
+# Namespace 삭제
+kubectl delete namespace cert-manager
+
+# =============================================================================
+# DNS-01 Challenge 예제 (Cloudflare)
+# =============================================================================
+# Cloudflare API Token Secret
+# kubectl create secret generic cloudflare-api-token \
+#   --from-literal=api-token=<your-cloudflare-api-token> \
+#   -n cert-manager
+
+# ClusterIssuer with DNS-01
+# apiVersion: cert-manager.io/v1
+# kind: ClusterIssuer
+# metadata:
+#   name: letsencrypt-dns
+# spec:
+#   acme:
+#     server: https://acme-v02.api.letsencrypt.org/directory
+#     email: your-email@example.com
+#     privateKeySecretRef:
+#       name: letsencrypt-dns
+#     solvers:
+#     - dns01:
+#         cloudflare:
+#           apiTokenSecretRef:
+#             name: cloudflare-api-token
+#             key: api-token
+
+# =============================================================================
+# 유용한 명령어
+# =============================================================================
+# 모든 Certificate 상태 확인
+kubectl get certificate -A
+
+# Certificate Ready 상태 확인
+kubectl get certificate -A -o jsonpath='{range .items[*]}{.metadata.namespace}{"\t"}{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}'
+
+# 만료 예정 인증서 확인 (describe로 확인)
+kubectl get certificate -A -o yaml | grep -A5 "notAfter"

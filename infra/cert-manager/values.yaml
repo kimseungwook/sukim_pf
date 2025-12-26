@@ -1,0 +1,287 @@
+# =============================================================================
+# cert-manager Helm Values - Customized for sukim-pf
+# =============================================================================
+# 버전: v1.16.x
+# 용도: Kubernetes TLS 인증서 자동 관리
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 공통 변수 정의 (YAML Anchors)
+# -----------------------------------------------------------------------------
+x-common-node-affinity: &common-node-affinity
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: service
+              operator: In
+              values:
+                - "tools"
+            - key: cpu-type
+              operator: In
+              values:
+                - "arm64"
+
+# =============================================================================
+# Global Configuration
+# =============================================================================
+global:
+  # 공통 레이블
+  commonLabels:
+    app.kubernetes.io/part-of: cert-manager
+
+  # 로그 레벨 (0-6, 6이 가장 상세)
+  logLevel: 2
+
+  # Leader election 설정
+  leaderElection:
+    namespace: "kube-system"
+
+  rbac:
+    create: true
+    aggregateClusterRoles: true
+
+  podSecurityPolicy:
+    enabled: false
+
+# CRD 설치 설정
+crds:
+  # Helm으로 CRD 설치 (첫 설치시 필수)
+  enabled: true
+  # CRD 유지 (Helm 삭제 시에도 CRD 보존)
+  keep: true
+
+# =============================================================================
+# Controller Configuration
+# =============================================================================
+replicaCount: 2  # 고가용성을 위해 2개 replica
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 0
+    maxUnavailable: 1
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Feature gates
+featureGates: ""
+
+# ACME DNS-01 challenge 설정
+maxConcurrentChallenges: 60
+
+image:
+  repository: quay.io/jetstack/cert-manager-controller
+  pullPolicy: IfNotPresent
+
+# ServiceAccount
+serviceAccount:
+  create: true
+  automountServiceAccountToken: true
+
+# 인증서 소유자 참조 활성화
+enableCertificateOwnerRef: false
+
+# 리소스 제한
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+# Security Context
+securityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+
+# Node Affinity
+affinity:
+  <<: *common-node-affinity
+
+nodeSelector:
+  kubernetes.io/os: linux
+
+# Liveness Probe
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 15
+  successThreshold: 1
+  failureThreshold: 8
+
+# =============================================================================
+# Webhook Configuration
+# =============================================================================
+webhook:
+  replicaCount: 2  # 고가용성
+
+  timeoutSeconds: 30
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+      - ALL
+    readOnlyRootFilesystem: true
+
+  affinity:
+    <<: *common-node-affinity
+
+  nodeSelector:
+    kubernetes.io/os: linux
+
+  serviceAccount:
+    create: true
+    automountServiceAccountToken: true
+
+  # GKE Private Cluster 호환을 위한 포트 설정
+  securePort: 10250
+
+  hostNetwork: false
+  serviceType: ClusterIP
+
+  networkPolicy:
+    enabled: false
+
+# =============================================================================
+# CA Injector Configuration
+# =============================================================================
+cainjector:
+  enabled: true
+  replicaCount: 2  # 고가용성
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+      - ALL
+    readOnlyRootFilesystem: true
+
+  affinity:
+    <<: *common-node-affinity
+
+  nodeSelector:
+    kubernetes.io/os: linux
+
+  serviceAccount:
+    create: true
+    automountServiceAccountToken: true
+
+# =============================================================================
+# ACME Solver Configuration
+# =============================================================================
+acmesolver:
+  image:
+    repository: quay.io/jetstack/cert-manager-acmesolver
+    pullPolicy: IfNotPresent
+
+# =============================================================================
+# Startup API Check
+# =============================================================================
+startupapicheck:
+  enabled: true
+  timeout: 1m
+  backoffLimit: 4
+
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi
+
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+      - ALL
+    readOnlyRootFilesystem: true
+
+  affinity:
+    <<: *common-node-affinity
+
+  nodeSelector:
+    kubernetes.io/os: linux
+
+  serviceAccount:
+    create: true
+    automountServiceAccountToken: true
+
+# =============================================================================
+# Prometheus Monitoring
+# =============================================================================
+prometheus:
+  enabled: true
+
+  servicemonitor:
+    enabled: true
+    prometheusInstance: default
+    interval: 60s
+    scrapeTimeout: 30s
+    labels:
+      release: prometheus-stack

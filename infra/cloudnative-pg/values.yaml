@@ -1,0 +1,159 @@
+# =============================================================================
+# CloudNativePG Operator Helm Values - Customized for sukim-pf
+# =============================================================================
+# CloudNativePG: Kubernetes-native PostgreSQL Operator
+# 오픈소스, CNCF 프로젝트
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 공통 변수 정의 (YAML Anchors)
+# -----------------------------------------------------------------------------
+x-common-node-affinity: &common-node-affinity
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: service
+              operator: In
+              values:
+                - "tools"
+            - key: cpu-type
+              operator: In
+              values:
+                - "arm64"
+
+# =============================================================================
+# Operator Configuration
+# =============================================================================
+replicaCount: 1
+
+image:
+  repository: ghcr.io/cloudnative-pg/cloudnative-pg
+  pullPolicy: IfNotPresent
+  tag: ""  # 차트의 appVersion 사용
+
+imagePullSecrets: []
+
+# Update strategy
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 0
+    maxUnavailable: 1
+
+# CRD 설치
+crds:
+  create: true
+
+# Webhook 설정
+webhook:
+  port: 9443
+  mutating:
+    create: true
+    failurePolicy: Fail
+  validating:
+    create: true
+    failurePolicy: Fail
+  livenessProbe:
+    initialDelaySeconds: 3
+  readinessProbe:
+    initialDelaySeconds: 3
+  startupProbe:
+    failureThreshold: 6
+    periodSeconds: 5
+
+# Operator 설정
+config:
+  create: true
+  name: cnpg-controller-manager-config
+  secret: false
+  clusterWide: true  # 전체 클러스터 관리
+  data: {}
+  maxConcurrentReconciles: 10
+
+# ServiceAccount
+serviceAccount:
+  create: true
+  name: ""
+
+# RBAC
+rbac:
+  create: true
+  aggregateClusterRoles: false
+
+# Annotations & Labels
+commonAnnotations: {}
+podAnnotations: {}
+podLabels: {}
+
+# Security Context (Kyverno 준수)
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+  capabilities:
+    drop:
+      - "ALL"
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+# Priority Class
+priorityClassName: ""
+
+# Service
+service:
+  type: ClusterIP
+  name: cnpg-webhook-service
+  port: 443
+  ipFamilyPolicy: ""
+  ipFamilies: []
+
+# Resources
+resources:
+  requests:
+    cpu: 100m
+    memory: 200Mi
+  limits:
+    cpu: 500m
+    memory: 500Mi
+
+# Node Affinity
+nodeSelector:
+  kubernetes.io/os: linux
+
+affinity:
+  <<: *common-node-affinity
+
+tolerations: []
+
+topologySpreadConstraints: []
+
+# =============================================================================
+# Monitoring (Prometheus)
+# =============================================================================
+monitoring:
+  podMonitorEnabled: true  # ✅ Prometheus Operator 사용중
+  podMonitorMetricRelabelings: []
+  podMonitorRelabelings: []
+  podMonitorAdditionalLabels:
+    release: prometheus-stack
+
+  grafanaDashboard:
+    create: true
+    # LGTM Stack - Grafana가 있는 namespace 지정
+    namespace: "monitoring"  # ✅ Grafana namespace
+    configMapName: "cnpg-grafana-dashboard"
+    labels:
+      grafana_dashboard: "1"
+    annotations: {}
+
+# Default monitoring queries (기본값 유지)
+monitoringQueriesConfigMap:
+  name: cnpg-default-monitoring
+  # queries는 default_values.yaml의 내용 그대로 사용
