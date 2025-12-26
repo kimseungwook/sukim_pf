@@ -1,0 +1,10 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-to-www
+  namespace: goyoai-web
+spec:
+  redirectRegex:
+    regex: ^https?://goyoai\.com(.*)
+    replacement: https://www.goyoai.com$1
+    permanent: true

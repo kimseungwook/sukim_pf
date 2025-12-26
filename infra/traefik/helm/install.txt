@@ -1,0 +1,1 @@
+helm upgrade --install traefik traefik/traefik -n traefik -f traefik/helm/values.yaml --version 38.0.1 --create-namespace

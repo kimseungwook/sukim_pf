@@ -1,0 +1,247 @@
+# =============================================================================
+# GoDaddy DNS-01 Challenge 설정 가이드
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Step 1: GoDaddy API 키 발급
+# -----------------------------------------------------------------------------
+# 1. GoDaddy 계정 로그인
+# 2. https://developer.godaddy.com/keys 접속
+# 3. API Key 생성:
+#    - Name: cert-manager (또는 원하는 이름)
+#    - Environment: Production (운영용) 또는 Test (테스트용)
+# 4. API Key와 API Secret 복사 및 안전하게 보관
+
+# API Key 예시:
+# API Key: abcdefghijklmnop123456
+# API Secret: AbCdEfGhIjKlMnOpQrStUv
+
+# -----------------------------------------------------------------------------
+# Step 2: godaddy-webhook 설치 (최신 버전: v0.6.0)
+# -----------------------------------------------------------------------------
+# GoDaddy webhook을 위한 Helm repository 추가
+helm repo add godaddy-webhook https://snowdrop.github.io/godaddy-webhook
+helm repo update
+
+# webhook 설치
+# groupName은 고유한 Kubernetes API Group 이름 (예: acme.sukim.com)
+# 이 이름은 도메인 이름과 직접적인 연결은 없으며, 기본값 사용 가능
+export DOMAIN=acme.sukim.com  # 또는 원하는 고유 이름
+helm install godaddy-webhook godaddy-webhook/godaddy-webhook \
+  --namespace cert-manager \
+  --set groupName=$DOMAIN
+
+# 또는 직접 값 지정
+# helm install godaddy-webhook godaddy-webhook/godaddy-webhook \
+#   --namespace cert-manager \
+#   --set groupName=acme.sukim.com
+
+# 설치 확인
+kubectl get pods -n cert-manager | grep godaddy
+
+# -----------------------------------------------------------------------------
+# Step 3: GoDaddy API Secret 생성
+# -----------------------------------------------------------------------------
+# API Key와 Secret을 Kubernetes Secret으로 저장
+kubectl create secret generic godaddy-api-key \
+  --from-literal=token=<YOUR_GODADDY_API_KEY>:<YOUR_GODADDY_API_SECRET> \
+  --namespace cert-manager
+
+# 예시:
+# kubectl create secret generic godaddy-api-key \
+#   --from-literal=token=abcdefghijklmnop123456:AbCdEfGhIjKlMnOpQrStUv \
+#   --namespace cert-manager
+
+# Secret 확인
+kubectl get secret godaddy-api-key -n cert-manager
+
+# -----------------------------------------------------------------------------
+# Step 4: ClusterIssuer 생성 (GoDaddy DNS-01)
+# -----------------------------------------------------------------------------
+# Let's Encrypt Staging (테스트용)
+cat <<EOF | kubectl apply -f -
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-godaddy-staging
+spec:
+  acme:
+    # Let's Encrypt Staging 서버 (테스트용)
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: your-email@example.com  # 수정 필요
+    privateKeySecretRef:
+      name: letsencrypt-godaddy-staging
+    solvers:
+    - dns01:
+        webhook:
+          groupName: acme.sukim.com  # Step 2에서 설정한 groupName과 동일하게
+          solverName: godaddy
+          config:
+            authApiKey: godaddy-api-key
+            authApiKeySecretRef:
+              key: token
+              name: godaddy-api-key
+            production: true  # Production API 사용시 true, OTE(Test) 사용시 false
+            ttl: 600  # DNS 레코드 TTL (초)
+EOF
+
+# Let's Encrypt Production (운영용)
+cat <<EOF | kubectl apply -f -
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-godaddy-prod
+spec:
+  acme:
+    # Let's Encrypt Production 서버
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: your-email@example.com  # 수정 필요
+    privateKeySecretRef:
+      name: letsencrypt-godaddy-prod
+    solvers:
+    - dns01:
+        webhook:
+          groupName: acme.sukim.com  # Step 2에서 설정한 groupName과 동일하게
+          solverName: godaddy
+          config:
+            authApiKey: godaddy-api-key
+            authApiKeySecretRef:
+              key: token
+              name: godaddy-api-key
+            production: true  # Production API 사용
+            ttl: 600
+EOF
+
+# ClusterIssuer 확인
+kubectl get clusterissuer
+kubectl describe clusterissuer letsencrypt-godaddy-prod
+
+# -----------------------------------------------------------------------------
+# Step 5: 인증서 발급 테스트
+# -----------------------------------------------------------------------------
+# 테스트용 Certificate 생성
+cat <<EOF | kubectl apply -f -
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: godaddy-test-certificate
+  namespace: default
+spec:
+  secretName: godaddy-test-tls
+  issuerRef:
+    name: letsencrypt-godaddy-staging
+    kind: ClusterIssuer
+  dnsNames:
+  - example.com  # 수정 필요: 실제 GoDaddy에서 관리하는 도메인
+  - "*.example.com"  # 와일드카드 인증서 (DNS-01만 가능)
+EOF
+
+# Certificate 상태 확인
+kubectl describe certificate godaddy-test-certificate -n default
+
+# Challenge 확인
+kubectl get challenge -A
+
+# Order 확인
+kubectl get order -A
+
+# 생성된 Secret 확인
+kubectl get secret godaddy-test-tls -n default
+
+# -----------------------------------------------------------------------------
+# Step 6: Traefik IngressRoute에서 사용
+# -----------------------------------------------------------------------------
+# IngressRoute에서 Certificate 사용 예시
+cat <<EOF | kubectl apply -f -
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: example-https
+  namespace: default
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(\`example.com\`)
+      kind: Rule
+      services:
+        - name: example-service
+          port: 80
+  tls:
+    secretName: godaddy-test-tls  # Certificate에서 생성한 Secret
+EOF
+
+# -----------------------------------------------------------------------------
+# Troubleshooting
+# -----------------------------------------------------------------------------
+# Webhook 로그 확인
+kubectl logs -n cert-manager -l app.kubernetes.io/name=godaddy-webhook
+
+# cert-manager controller 로그
+kubectl logs -n cert-manager -l app.kubernetes.io/component=controller
+
+# Challenge 상세 정보
+kubectl describe challenge <challenge-name> -n <namespace>
+
+# Order 상세 정보
+kubectl describe order <order-name> -n <namespace>
+
+# Certificate events 확인
+kubectl get events -n <namespace> --field-selector involvedObject.name=<certificate-name>
+
+# -----------------------------------------------------------------------------
+# 일반적인 문제 해결
+# -----------------------------------------------------------------------------
+# 1. DNS propagation 대기 시간
+#    - GoDaddy DNS 전파는 10분 정도 소요될 수 있음
+#    - ttl 값을 조정하여 대기 시간 설정 가능
+
+# 2. API Rate Limiting
+#    - GoDaddy API는 rate limit이 있음
+#    - 너무 자주 인증서를 재발급하지 않도록 주의
+
+# 3. groupName 불일치
+#    - webhook 설치시 사용한 groupName과 ClusterIssuer의 groupName이 일치해야 함
+
+# 4. Secret namespace
+#    - godaddy-api-key Secret은 cert-manager namespace에 있어야 함
+
+# -----------------------------------------------------------------------------
+# 업그레이드
+# -----------------------------------------------------------------------------
+# webhook 업그레이드
+helm repo update
+helm upgrade godaddy-webhook godaddy-webhook/godaddy-webhook \
+  --namespace cert-manager \
+  --set groupName=acme.sukim.com
+
+# -----------------------------------------------------------------------------
+# 삭제
+# -----------------------------------------------------------------------------
+# Certificate 삭제
+kubectl delete certificate godaddy-test-certificate -n default
+
+# ClusterIssuer 삭제
+kubectl delete clusterissuer letsencrypt-godaddy-staging letsencrypt-godaddy-prod
+
+# webhook 삭제
+helm uninstall godaddy-webhook -n cert-manager
+
+# Secret 삭제
+kubectl delete secret godaddy-api-key -n cert-manager
+
+# =============================================================================
+# 참고 자료
+# =============================================================================
+# - GoDaddy API Docs: https://developer.godaddy.com/doc
+# - godaddy-webhook GitHub: https://github.com/snowdrop/godaddy-webhook
+# - godaddy-webhook Helm Chart: https://snowdrop.github.io/godaddy-webhook
+# - cert-manager DNS-01: https://cert-manager.io/docs/configuration/acme/dns01/
+
+# =============================================================================
+# 추가 팁
+# =============================================================================
+# 1. 와일드카드 인증서는 DNS-01 방식만 지원 (HTTP-01은 불가)
+# 2. GoDaddy API는 서브도메인도 지원
+# 3. 여러 도메인을 한 Certificate에 포함 가능
+# 4. 인증서 자동 갱신은 cert-manager가 관리

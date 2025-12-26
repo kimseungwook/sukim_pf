@@ -1,0 +1,41 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-godaddy-prod
+spec:
+  acme:
+    # Let's Encrypt Production 서버
+    server: https://acme-v02.api.letsencrypt.org/directory
+    
+    # 알림을 받을 이메일 주소 (수정 필요)
+    email: your-email@example.com
+    
+    # Let's Encrypt 계정 private key를 저장할 Secret
+    privateKeySecretRef:
+      name: letsencrypt-godaddy-prod
+    
+    # DNS-01 Challenge Solver 설정
+    solvers:
+    - dns01:
+        webhook:
+          # godaddy-webhook 설치시 사용한 groupName
+          # 예: acme.sukim.com (실제 사용 예제)
+          groupName: acme.sukim.com
+          
+          # GoDaddy webhook solver 이름
+          solverName: godaddy
+          
+          # GoDaddy API 설정
+          config:
+            authApiKey: godaddy-api-key
+            authApiKeySecretRef:
+              # cert-manager namespace에 생성한 Secret 이름
+              name: godaddy-api-key
+              # Secret의 key 이름
+              key: token
+            
+            # Production API 사용 (true), OTE Test API (false)
+            production: true
+            
+            # DNS 레코드 TTL (초)
+            ttl: 600

@@ -1,0 +1,367 @@
+logs:
+  general:
+    level: DEBUG  # Sets the log level to DEBUG
+  access:
+    enabled: true
+service:
+  enabled: true
+  single: true  # Uses a single service for both TCP and UDP when set to true
+  type: LoadBalancer
+  annotations:
+    # Application Load Balancer - TCP 리스너 기본 사용 (HTTP도 지원)
+    oci.oraclecloud.com/load-balancer-type: "lb"
+    oci.oraclecloud.com/oci-network-security-groups: "ocid1.networksecuritygroup.oc1.ap-seoul-1.aaaaaaaatnvh34mjrmuauqxv5hafbcyk5dpv4xyun4jtb24vjbuopqshoxqq"
+    service.beta.kubernetes.io/oci-load-balancer-security-list-management-mode: "None"
+    service.beta.kubernetes.io/oci-load-balancer-shape: "flexible"
+    service.beta.kubernetes.io/oci-load-balancer-shape-flex-min: "100"
+    service.beta.kubernetes.io/oci-load-balancer-shape-flex-max: "200"
+    service.beta.kubernetes.io/oci-load-balancer-connection-idle-timeout: "600"
+    # OCI 콘솔에서 표시될 Load Balancer 이름 태그
+    oci.oraclecloud.com/initial-freeform-tags-override: '{"service": "sukim-pf", "instance": "back"}'
+
+metrics:
+  # 내부 리소스(entrypoint, service 등)에 대한 메트릭도 수집
+  addInternals: true
+  prometheus:
+    # metrics entrypoint를 사용하여 Prometheus 메트릭 노출
+    entryPoint: metrics
+    # EntryPoint별 레이블 추가 (예: web, websecure)
+    addEntryPointsLabels: true
+    # Router별 레이블 추가 (라우팅 규칙별 메트릭)
+    addRoutersLabels: true
+    # Service별 레이블 추가 (백엔드 서비스별 메트릭)
+    addServicesLabels: true
+    # 레이턴시 메트릭 히스토그램 버킷 (초 단위)
+    # 0.1s, 0.3s, 1.2s, 5s 구간으로 응답 시간 분포 측정
+    buckets: "0.1,0.3,1.2,5.0"
+    # 메트릭 전용 Kubernetes Service 생성
+    service:
+      enabled: true
+      labels:
+        app: traefik
+        component: metrics
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+    # Prometheus Operator API 체크 비활성화 (CRD 없어도 동작)
+    disableAPICheck: true
+    # Prometheus Operator ServiceMonitor CRD
+    serviceMonitor:
+      enabled: true
+      # 메트릭 재레이블링 - Prometheus에 저장되기 전 메트릭 가공
+      metricRelabelings:
+        # instance 레이블에서 포트 제거 (IP만 남김)
+        - sourceLabels: [instance]
+          regex: '([^:]+)(:[0-9]+)?'
+          targetLabel: instance
+          replacement: '${1}'
+          action: replace
+        # pod 정보 추가
+        - sourceLabels: [pod]
+          targetLabel: traefik_pod
+          action: replace
+      # 타겟 재레이블링 - 스크랩 전 타겟 레이블 가공
+      relabelings:
+        # Kubernetes 네임스페이스 레이블 추가
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+          action: replace
+        # Pod 이름 레이블 추가
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+          action: replace
+        # Service 이름 레이블 추가
+        - sourceLabels: [__meta_kubernetes_service_name]
+          targetLabel: service
+          action: replace
+      # Prometheus job 레이블로 사용할 값
+      jobLabel: traefik
+      # 스크랩 간격
+      interval: 30s
+      # 타겟의 레이블을 우선 사용 (충돌 시)
+      honorLabels: true
+      # 스크랩 타임아웃
+      scrapeTimeout: 10s
+      # 메트릭의 타임스탬프 사용
+      honorTimestamps: true
+      # HTTP/2 사용
+      enableHttp2: true
+      # 리다이렉트 따라가기
+      followRedirects: true
+      # ServiceMonitor에 추가할 레이블 (Prometheus가 이 레이블로 ServiceMonitor 선택)
+      additionalLabels:
+        release: prometheus-stack
+        app: traefik
+      # ServiceMonitor를 생성할 네임스페이스
+      namespace: prometheus
+      # 모니터링할 서비스가 있는 네임스페이스 선택
+      namespaceSelector:
+        matchNames:
+          - traefik  # Traefik이 설치된 네임스페이스
+    # Prometheus Rule (알람/기록 규칙)
+    prometheusRule:
+      enabled: true
+      additionalLabels:
+        release: prometheus-stack
+      namespace: prometheus
+      rules:
+        # Traefik 서비스 다운 알람
+        - alert: TraefikDown
+          expr: up{job="traefik"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            component: traefik
+          annotations:
+            summary: "Traefik instance is down"
+            description: "Traefik instance {{ $labels.instance }} in namespace {{ $labels.namespace }} has been down for more than 5 minutes."
+        
+        # Traefik 높은 에러율 알람 (5% 초과)
+        - alert: TraefikHighErrorRate
+          expr: |
+            (
+              sum(rate(traefik_service_requests_total{code=~"5.."}[5m])) by (service)
+              /
+              sum(rate(traefik_service_requests_total[5m])) by (service)
+            ) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+            component: traefik
+          annotations:
+            summary: "High HTTP 5xx error rate on Traefik service"
+            description: "Service {{ $labels.service }} has {{ $value | humanizePercentage }} error rate (5xx responses) over the last 5 minutes."
+        
+        # Traefik 매우 높은 에러율 알람 (15% 초과)
+        - alert: TraefikVeryHighErrorRate
+          expr: |
+            (
+              sum(rate(traefik_service_requests_total{code=~"5.."}[5m])) by (service)
+              /
+              sum(rate(traefik_service_requests_total[5m])) by (service)
+            ) > 0.15
+          for: 2m
+          labels:
+            severity: critical
+            component: traefik
+          annotations:
+            summary: "Very high HTTP 5xx error rate on Traefik service"
+            description: "Service {{ $labels.service }} has {{ $value | humanizePercentage }} error rate (5xx responses) over the last 2 minutes."
+        
+        # Traefik 높은 응답 시간 알람 (P95 > 5초)
+        - alert: TraefikHighLatency
+          expr: |
+            histogram_quantile(0.95, 
+              sum(rate(traefik_service_request_duration_seconds_bucket[5m])) by (le, service)
+            ) > 5
+          for: 10m
+          labels:
+            severity: warning
+            component: traefik
+          annotations:
+            summary: "High response latency on Traefik service"
+            description: "Service {{ $labels.service }} has P95 latency of {{ $value }}s over the last 10 minutes."
+        
+        # Traefik Backend 전체 다운 알람
+        - alert: TraefikBackendDown
+          expr: |
+            sum(traefik_service_server_up) by (service) == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: traefik
+          annotations:
+            summary: "Traefik backend service is completely down"
+            description: "All backend servers for service {{ $labels.service }} are down."
+        
+        # Traefik Backend 일부 다운 알람
+        - alert: TraefikBackendPartiallyDown
+          expr: |
+            (
+              sum(traefik_service_server_up) by (service)
+              /
+              count(traefik_service_server_up) by (service)
+            ) < 0.5
+          for: 5m
+          labels:
+            severity: warning
+            component: traefik
+          annotations:
+            summary: "Traefik backend service is partially down"
+            description: "More than 50% of backend servers for service {{ $labels.service }} are down."
+        
+        # Traefik TLS 인증서 만료 임박 알람 (30일 이내)
+        - alert: TraefikTLSCertExpiringSoon
+          expr: |
+            (traefik_tls_certs_not_after - time()) / 86400 < 30
+          for: 1h
+          labels:
+            severity: warning
+            component: traefik
+          annotations:
+            summary: "TLS certificate expiring soon"
+            description: "TLS certificate will expire in {{ $value }} days."
+        
+        # Traefik TLS 인증서 만료 임박 알람 (7일 이내)
+        - alert: TraefikTLSCertExpiringVerySoon
+          expr: |
+            (traefik_tls_certs_not_after - time()) / 86400 < 7
+          for: 1h
+          labels:
+            severity: critical
+            component: traefik
+          annotations:
+            summary: "TLS certificate expiring very soon"
+            description: "TLS certificate will expire in {{ $value }} days. Immediate action required!"
+        
+        # Traefik 높은 연결 수 알람
+        - alert: TraefikHighConnectionCount
+          expr: |
+            sum(traefik_entrypoint_open_connections) by (entrypoint) > 1000
+          for: 5m
+          labels:
+            severity: warning
+            component: traefik
+          annotations:
+            summary: "High number of open connections on Traefik"
+            description: "EntryPoint {{ $labels.entrypoint }} has {{ $value }} open connections."
+        
+        # Traefik 요청률 급증 알람 (평소 대비 2배 이상)
+        - alert: TraefikRequestRateSpike
+          expr: |
+            (
+              sum(rate(traefik_entrypoint_requests_total[5m])) by (entrypoint)
+              /
+              sum(rate(traefik_entrypoint_requests_total[1h] offset 1h)) by (entrypoint)
+            ) > 2
+          for: 5m
+          labels:
+            severity: info
+            component: traefik
+          annotations:
+            summary: "Request rate spike on Traefik"
+            description: "EntryPoint {{ $labels.entrypoint }} is receiving {{ $value }}x more requests than usual."
+ports:
+  metrics:
+    port: 9100
+    expose: 
+      default: false
+    exposedPort: 9100
+    protocol: TCP
+    observability:
+      metrics: true
+      accessLogs: true
+      tracing: true
+      traceVerbosity: minimal
+
+  web:
+    asDefault: null
+    port: 8000
+    expose:
+      default: true
+    exposedPort: 80
+    protocol: TCP
+    transport:
+      respondingTimeouts:
+        readTimeout: 300s
+        writeTimeout: 300s
+        idleTimeout: 300s
+    forwardedHeaders:
+      trustedIPs: []
+      insecure: true
+    proxyProtocol:
+      trustedIPs: []
+      insecure: false
+    observability:
+      metrics: true
+      accessLogs: true
+      tracing: true
+      traceVerbosity: minimal
+
+  websecure:
+    asDefault: null
+    port: 8443
+    expose:
+      default: true
+    exposedPort: 443
+    protocol: TCP
+    allowACMEByPass: false
+    transport:
+      respondingTimeouts:
+        readTimeout: 300s
+        writeTimeout: 300s
+        idleTimeout: 300s
+    forwardedHeaders:
+      trustedIPs: []
+      insecure: true
+    proxyProtocol:
+      trustedIPs: []
+      insecure: false
+    tls:
+      enabled: true
+      options: ""
+      certResolver: ""
+      domains: []
+    middlewares: []
+    observability:
+      metrics: true
+      accessLogs: true
+      tracing: true
+      traceVerbosity: minimal
+
+additionalArguments:
+  - "--metrics.prometheus=true"
+  - "--metrics.prometheus.entrypoint=metrics"
+  - "--entryPoints.metrics.address=:9100"
+
+deployment:
+  enabled: true
+  kind: Deployment
+  replicas: 2
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "9100"
+    prometheus.io/scheme: "http"
+  labels:
+    app: goyoai-web-back-traefik
+    instance: goyoai-web-back
+
+# affinity와 tolerations를 제거하여 모든 노드에 스케줄링 가능
+# affinity: {}
+# tolerations: []
+
+
+providers:
+  kubernetesCRD:
+    enabled: true
+    allowCrossNamespace: false
+    allowExternalNameServices: false
+    allowEmptyServices: true
+    ingressClass: ""
+    labelSelector: ""
+    namespaces: []  # 모든 네임스페이스 감시
+    nativeLBByDefault: false
+  kubernetesIngress:
+    enabled: true
+    allowExternalNameServices: false
+    allowEmptyServices: true
+    disableIngressClassLookup: false
+    ingressClass: null
+    labelSelector: null
+    namespaces: []  # 모든 네임스페이스 감시
+    publishedService:
+      enabled: true
+      pathOverride: ""
+    nativeLBByDefault: false
+    strictPrefixMatching: false
+  kubernetesGateway:
+    enabled: false
+    experimentalChannel: false
+    namespaces: []
+    labelSelector: ""
+    nativeLBByDefault: false
+  file:
+    enabled: false
+    watch: true
+    content: ""
