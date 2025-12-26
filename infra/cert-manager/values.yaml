@@ -5,23 +5,6 @@
 # 용도: Kubernetes TLS 인증서 자동 관리
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# 공통 변수 정의 (YAML Anchors)
-# -----------------------------------------------------------------------------
-x-common-node-affinity: &common-node-affinity
-  nodeAffinity:
-    requiredDuringSchedulingIgnoredDuringExecution:
-      nodeSelectorTerms:
-        - matchExpressions:
-            - key: service
-              operator: In
-              values:
-                - "tools"
-            - key: cpu-type
-              operator: In
-              values:
-                - "arm64"
-
 # =============================================================================
 # Global Configuration
 # =============================================================================
@@ -108,7 +91,18 @@ containerSecurityContext:
 
 # Node Affinity
 affinity:
-  <<: *common-node-affinity
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: service
+              operator: In
+              values:
+                - "tools"
+            - key: cpu-type
+              operator: In
+              values:
+                - "arm64"
 
 nodeSelector:
   kubernetes.io/os: linux
@@ -161,7 +155,18 @@ webhook:
     readOnlyRootFilesystem: true
 
   affinity:
-    <<: *common-node-affinity
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: service
+                operator: In
+                values:
+                  - "tools"
+              - key: cpu-type
+                operator: In
+                values:
+                  - "arm64"
 
   nodeSelector:
     kubernetes.io/os: linux
@@ -217,7 +222,18 @@ cainjector:
     readOnlyRootFilesystem: true
 
   affinity:
-    <<: *common-node-affinity
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: service
+                operator: In
+                values:
+                  - "tools"
+              - key: cpu-type
+                operator: In
+                values:
+                  - "arm64"
 
   nodeSelector:
     kubernetes.io/os: linux
@@ -263,7 +279,18 @@ startupapicheck:
     readOnlyRootFilesystem: true
 
   affinity:
-    <<: *common-node-affinity
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: service
+                operator: In
+                values:
+                  - "tools"
+              - key: cpu-type
+                operator: In
+                values:
+                  - "arm64"
 
   nodeSelector:
     kubernetes.io/os: linux

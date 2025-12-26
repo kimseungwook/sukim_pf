@@ -35,7 +35,7 @@ kubectl get crds | grep postgresql
 # -----------------------------------------------------------------------------
 # Step 5: PostgreSQL Secrets 생성
 # -----------------------------------------------------------------------------
-kubectl apply -f pg-secrets.yaml
+kubectl apply -f cloudnative-pg/pg-secrets.yaml
 
 # Secret 확인
 kubectl get secrets -n cloudnative-pg | grep nocodb-pg
@@ -43,7 +43,7 @@ kubectl get secrets -n cloudnative-pg | grep nocodb-pg
 # -----------------------------------------------------------------------------
 # Step 6: PostgreSQL Cluster 생성
 # -----------------------------------------------------------------------------
-kubectl apply -f nocodb-pg-cluster.yaml
+kubectl apply -f cloudnative-pg/nocodb-pg-cluster.yaml
 
 # Cluster 상태 확인
 kubectl get cluster -n cloudnative-pg

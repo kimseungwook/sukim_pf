@@ -25,9 +25,10 @@ helm repo update
 # Step 4: cert-manager 설치
 # -----------------------------------------------------------------------------
 helm upgrade --install cert-manager jetstack/cert-manager \
-  -f values.yaml \
+  -f cert-manager/values.yaml \
   -n cert-manager \
-  --version v1.16.2
+  --version v1.16.2 \
+  --create-namespace
 
 # -----------------------------------------------------------------------------
 # Step 5: 설치 확인

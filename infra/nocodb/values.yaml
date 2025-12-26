@@ -19,8 +19,12 @@ image:
   tag: 0.264.9
 
 env:
-  # NocoDB Database Connection - 템플릿 방식
-  NC_DB: 'pg://{{ include "common.names.fullname" . }}-postgresql:5432?u={{ .Values.postgresql.auth.username }}&p={{ .Values.postgresql.auth.password }}&d={{ .Values.postgresql.auth.database }}'
+  # NocoDB Database Connection - CloudNativePG Secret 참조
+  NC_DB:
+    valueFrom:
+      secretKeyRef:
+        name: nocodb-env-secrets
+        key: NC_DB
   # NC_REDIS_URL: 'redis://nocodb-redis-master.redis.svc.cluster.local:6379/0'
 
 # Security Context (Kyverno Policy 준수)

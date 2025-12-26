@@ -5,8 +5,8 @@ metadata:
   name: nocodb-pg
   namespace: cloudnative-pg
 spec:
-  # PostgreSQL 인스턴스 수 (고가용성)
-  instances: 2
+  # PostgreSQL 인스턴스 수 (Portfolio용 - 단일 인스턴스)
+  instances: 1
   
   # PostgreSQL 버전
   imageName: ghcr.io/cloudnative-pg/postgresql:16.2
@@ -23,19 +23,19 @@ spec:
   superuserSecret:
     name: nocodb-pg-superuser
   
-  # Storage
+  # Storage (Portfolio용 - 최소 사양)
   storage:
     storageClass: oci-bv
-    size: 10Gi
+    size: 5Gi  # 5GB로 충분
   
-  # Resources
+  # Resources (Portfolio용 - 최소 사양)
   resources:
     requests:
-      memory: "512Mi"
-      cpu: "500m"
+      memory: "256Mi"  # 최소 메모리
+      cpu: "250m"      # 최소 CPU
     limits:
-      memory: "1Gi"
-      cpu: "1000m"
+      memory: "512Mi"  # 제한
+      cpu: "500m"
   
   # Node Affinity
   affinity:
@@ -48,28 +48,26 @@ spec:
                 values:
                   - tools
   
-  # PostgreSQL Configuration
+  # PostgreSQL Configuration (최소 사양 최적화)
   postgresql:
     parameters:
-      max_connections: "200"
-      shared_buffers: "256MB"
-      effective_cache_size: "768MB"
-      maintenance_work_mem: "64MB"
+      max_connections: "100"              # 100으로 충분
+      shared_buffers: "128MB"             # 메모리 절약
+      effective_cache_size: "384MB"       # 메모리에 맞춤
+      maintenance_work_mem: "32MB"        # 최소화
       checkpoint_completion_target: "0.9"
-      wal_buffers: "16MB"
+      wal_buffers: "8MB"                  # 최소화
       default_statistics_target: "100"
       random_page_cost: "1.1"
       effective_io_concurrency: "200"
       work_mem: "2621kB"
-      min_wal_size: "1GB"
-      max_wal_size: "4GB"
+      min_wal_size: "512MB"               # 최소화
+      max_wal_size: "1GB"                 # 최소화
   
-  # Monitoring
-  monitoring:
-    enabled: true
-    podMonitorEnabled: true
+  # Monitoring은 Operator values.yaml에서 설정 (podMonitorEnabled: true)
+  # Cluster 레벨에서는 자동으로 활성화됨
   
-  # Backup (선택사항)
+  # Backup (선택사항 - Portfolio에서는 비활성화)
   # backup:
   #   barmanObjectStore:
   #     destinationPath: s3://my-bucket/backup
@@ -82,4 +80,4 @@ spec:
   #         key: SECRET_ACCESS_KEY
   #     wal:
   #       compression: gzip
-  #   retentionPolicy: "30d"
+  #   retentionPolicy: "7d"  # Portfolio용이면 7일로 충분

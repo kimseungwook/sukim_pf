@@ -8,23 +8,23 @@
 kubectl create namespace nocodb
 
 # -----------------------------------------------------------------------------
-# Step 2: PostgreSQL 별도 설치 (Bitnami Chart)
+# Step 2: CloudNativePG PostgreSQL 연결 Secret 생성
 # -----------------------------------------------------------------------------
-# NocoDB Chart는 PostgreSQL subchart를 더 이상 지원하지 않음
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm repo update
+# CloudNativePG는 cloudnative-pg namespace에 설치되어 있어야 함
+# PostgreSQL Cluster: nocodb-pg
 
-helm upgrade --install nocodb-postgresql bitnami/postgresql \
-  -n nocodb \
-  --set auth.username=nocodb \
-  --set auth.password=nocodb \
-  --set auth.database=nocodb \
-  --set auth.postgresPassword=nocodb \
-  --set primary.persistence.enabled=false \
-  --set primary.nodeSelector.service=tools
+# 1. CloudNativePG에서 생성한 앱 암호 확인
+kubectl get secret nocodb-pg-app -n cloudnative-pg -o jsonpath='{.data.password}' | base64 -d
+echo  # 줄바꿈
 
-# PostgreSQL 실행 확인
-kubectl get pods -n nocodb -l app.kubernetes.io/name=postgresql
+# 2. 위에서 확인한 암호를 nocodb-env-secret.yaml에 입력
+# NC_DB: "pg://nocodb-pg-rw.cloudnative-pg.svc.cluster.local:5432?u=nocodb&p=YOUR_PASSWORD&d=nocodb"
+
+# 3. Secret 적용
+kubectl apply -f nocodb/nocodb-env-secret.yaml
+
+# Secret 확인
+kubectl get secret nocodb-env-secrets -n nocodb
 
 # -----------------------------------------------------------------------------
 # Step 3: Helm Repository 추가
