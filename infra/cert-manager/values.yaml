@@ -55,6 +55,11 @@ featureGates: ""
 # ACME DNS-01 challenge 설정
 maxConcurrentChallenges: 60
 
+# DNS-01 challenge용 public DNS 서버 강제 사용 (GoDaddy webhook Issue #35 fix)
+# 내부 DNS 사용 시 도메인 파싱 오류 발생하여 공개 DNS만 사용
+dns01RecursiveNameservers: "8.8.8.8:53,1.1.1.1:53"
+dns01RecursiveNameserversOnly: true
+
 image:
   repository: quay.io/jetstack/cert-manager-controller
   pullPolicy: IfNotPresent

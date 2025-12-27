@@ -1,0 +1,14 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: godaddy-certificate
+  namespace: traefik
+spec:
+  secretName: godaddy-tls
+  renewBefore: 240h
+  issuerRef:
+    name: letsencrypt-godaddy-prod
+    kind: ClusterIssuer
+  dnsNames:
+  - '8ai.store'  # root domain
+  - '*.8ai.store'  # 와일드카드 인증서 (DNS-01만 가능)

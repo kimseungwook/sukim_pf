@@ -29,3 +29,4 @@ terraform.rc
 **/env-secret.yaml
 **/pg-secrets.yaml
 **/nocodb-env-secret.yaml
+**/report_secret.yaml

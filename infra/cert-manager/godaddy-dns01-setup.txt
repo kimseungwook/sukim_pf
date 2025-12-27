@@ -54,7 +54,8 @@ kubectl create secret generic godaddy-api-key \
 
 # Secret 확인
 kubectl get secret godaddy-api-key -n cert-manager
-
+다른 namespace 사용시 기존 namespace의 secret을 복사
+kubectl get secret godaddy-api-key -n cert-manager -o yaml | sed 's/namespace: cert-manager/namespace: traefik/' | kubectl apply -f - 
 # -----------------------------------------------------------------------------
 # Step 4: ClusterIssuer 생성 (GoDaddy DNS-01)
 # -----------------------------------------------------------------------------

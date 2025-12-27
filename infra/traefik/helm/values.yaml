@@ -324,8 +324,8 @@ deployment:
     prometheus.io/port: "9100"
     prometheus.io/scheme: "http"
   labels:
-    app: goyoai-web-back-traefik
-    instance: goyoai-web-back
+    app: traefik
+    instance: traefik
 
 # affinity와 tolerations를 제거하여 모든 노드에 스케줄링 가능
 # affinity: {}
@@ -335,7 +335,7 @@ deployment:
 providers:
   kubernetesCRD:
     enabled: true
-    allowCrossNamespace: false
+    allowCrossNamespace: true
     allowExternalNameServices: false
     allowEmptyServices: true
     ingressClass: ""

@@ -2,7 +2,6 @@ apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: letsencrypt-godaddy-prod
-  namespace: cert-manager
 spec:
   acme:
     # Let's Encrypt Production 서버
@@ -11,14 +10,16 @@ spec:
     privateKeySecretRef:
       name: letsencrypt-godaddy-prod
     solvers:
-    - dns01:
+    - selector:
+        dnsZones:
+          - '8ai.store'
+      dns01:
         webhook:
           groupName: acme.sukim.com  # Step 2에서 설정한 groupName과 동일하게
           solverName: godaddy
           config:
-            authApiKey: godaddy-api-key
-            authApiKeySecretRef:
-              key: token
+            apiKeySecretRef:
               name: godaddy-api-key
+              key: token
             production: true  # Production API 사용
             ttl: 600

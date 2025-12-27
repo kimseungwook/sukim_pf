@@ -1,81 +1,117 @@
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: goyoai-web-http
-  namespace: goyoai-web
+  name: sukim-pf-http
+  namespace: traefik
 spec:
   entryPoints:
     - web
   routes:
     - kind: Rule
-      match: Host(`go-intern-admin.goyoai.com`) && PathPrefix(`/`)
+      match: Host(`tekton.8ai.store`)
       middlewares:
         - name: redirect-http-https
       services:
         - kind: Service
-          name: goyoai-web-front-admin
-          port: 5000
+          name: tekton-pipelines
+          port: 9097
+
     - kind: Rule
-      match: Host(`go-intern.goyoai.com`) && PathPrefix(`/`)
+      match: Host(`argocd.8ai.store`)
       middlewares:
         - name: redirect-http-https
       services:
         - kind: Service
-          name: goyoai-gointern-web
-          port: 5000
+          name: argocd-server
+          namespace: argocd
+          port: 80
+
     - kind: Rule
-      match: Host(`go-intern-api.goyoai.com`) && PathPrefix(`/`)
+      match: Host(`authentik.8ai.store`)
       middlewares:
         - name: redirect-http-https
       services:
         - kind: Service
-          name: goyoai-gointern-system
-          port: 5000
+          name: authentik-server
+          namespace: authentik
+          port: 80
+
     - kind: Rule
-      match: Host(`go-intern-api-portal.goyoai.com`) && PathPrefix(`/`)
+      match: Host(`harbor.8ai.store`)
       middlewares:
         - name: redirect-http-https
       services:
         - kind: Service
-          name: goyoai-gointern-portal
-          port: 5000
+          name: harbor-portal
+          namespace: harbor
+          port: 80
+
     - kind: Rule
-      match: Host(`goyoai.com`) && PathPrefix(`/`)
-      # match: PathPrefix(`/`)
+      match: Host(`kyverno.8ai.store`)
       middlewares:
         - name: redirect-http-https
       services:
         - kind: Service
-          name: goyoai-web-page
-          namespace: goyoai-web
-          port: 5000
+          name: policy-reporter-ui
+          namespace: kyverno
+          port: 8080
+
     - kind: Rule
-      match: Host(`ksure.goyoai.com`) && PathPrefix(`/`)
-      # match: PathPrefix(`/`)
+      match: Host(`grafana.8ai.store`)
       middlewares:
         - name: redirect-http-https
       services:
         - kind: Service
-          name: goyoai-web-front-v2
-          namespace: goyoai-web
-          port: 5001
+          name: grafana
+          namespace: monitoring
+          port: 3000
+
     - kind: Rule
-      match: Host(`stage.goyoai.com`) && PathPrefix(`/`)
-      # match: PathPrefix(`/`)
+      match: Host(`grafana.8ai.store`)
       middlewares:
         - name: redirect-http-https
       services:
         - kind: Service
-          name: goyoai-gointern-web
-          namespace: goyoai-web
-          port: 5001
+          name: grafana
+          namespace: monitoring
+          port: 3000
+
     - kind: Rule
-      match: Host(`stage-api.goyoai.com`) && PathPrefix(`/`)
-      # match: PathPrefix(`/`)
+      match: Host(`nocodb.8ai.store`)
       middlewares:
         - name: redirect-http-https
       services:
         - kind: Service
-          name: goyoai-gointern-system
-          namespace: goyoai-web
-          port: 5000
+          name: nocodb
+          namespace: nocodb
+          port: 8080
+
+    - kind: Rule
+      match: Host(`trivy.8ai.store`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: trivy-operator-dashboard
+          namespace: trivy
+          port: 8900
+
+    - kind: Rule
+      match: Host(`kuma.8ai.store`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: uptime-kuma
+          namespace: uptime-kuma
+          port: 3001
+
+    - kind: Rule
+      match: Host(`vault.8ai.store`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: vault-ui
+          namespace: vault
+          port: 8200

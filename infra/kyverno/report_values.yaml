@@ -36,7 +36,7 @@ target:
   # 1) Slack: 중요한 알림만 받기
   slack:
     enabled: true
-    webhook: "https://hooks.slack.com/services/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" # 🔴 실제 Webhook URL 입력 필요
+    secretRef: "policy-reporter-slack-webhook" # Secret 참조
     skipExistingOnStartup: true
     minimumSeverity: "fail" # fail, error, critical 등급만 전송
     filter:
@@ -46,11 +46,11 @@ target:
   # 2) Loki: 전체 감사 로그 저장
   loki:
     enabled: true
-    host: "http://goyo-loki-distributed-gateway.lgtm.svc.cluster.local:80"
+    host: "http://loki-gateway.monitoring.svc.cluster.local:80"
     minimumSeverity: "info" # 모든 정보 저장
     skipExistingOnStartup: true
     customFields:
-      cluster: "goyoai-dev" # 클러스터 식별자
+      cluster: "kyverno" # 클러스터 식별자
 
 # -----------------------------------------------------------------------------
 # 3. 필터 설정 (데이터 수집 규칙)
@@ -68,7 +68,7 @@ sourceFilters:
         - kube-node-lease
     disableClusterReports: false
    
-  # Trivy: goyoai-web 포함
+  # Trivy 포함
   - selector:
       sources: 
         - trivy-vulnerabilityreport
@@ -76,7 +76,7 @@ sourceFilters:
         - trivy-exposedsecretreport
     namespaces:
       include:
-        - goyoai-web
+        - sukim-web
     disableClusterReports: false
 
 worker: 5
@@ -100,7 +100,7 @@ monitoring:
     interval: 30s
     scrapeTimeout: 10s
     labels:
-      release: goyo-prometheus-stack
+      release: prometheus-stack
   
   # [추가] Grafana 대시보드 자동 생성 (ConfigMap 방식)
   grafana:
@@ -132,7 +132,7 @@ ui:
     level: debug
    
   ingress:
-    enabled: true
+    enabled: false
     annotations:
       nginx.ingress.kubernetes.io/rewrite-target: /$1
     className: nginx

@@ -4,12 +4,8 @@ metadata:
   name: config
   namespace: tekton-pipelines
 spec:
+  profile: all
   config:
     nodeSelector:
-      goyo-svc: deploy
-    tolerations:
-    - key: "goyo-svc"
-      operator: "Equal"
-      value: "deploy"
-      effect: "NoSchedule"
+      service: tools
     priorityClassName: system-node-critical

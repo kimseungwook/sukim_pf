@@ -1,0 +1,147 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: sukim-pf-https
+  namespace: traefik
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`tekton.8ai.store`)
+      priority: 10
+      services:
+        - name: tekton-dashboard
+          namespace: tekton-pipelines
+          port: 9097
+
+    - kind: Rule
+      match: Host(`argocd.8ai.store`)
+      priority: 10
+      services:
+        - name: argocd-server
+          namespace: argocd
+          port: 80
+
+    - kind: Rule
+      match: Host(`authentik.8ai.store`)
+      priority: 10
+      services:
+        - name: authentik-server
+          namespace: authentik
+          port: 80
+
+    # /api/ 경로 - harbor-core 서비스로 연결
+    - kind: Rule
+      match: Host(`harbor.8ai.store`) && PathPrefix(`/api/`)
+      priority: 20
+      services:
+        - name: harbor-core
+          namespace: harbor
+          port: 80
+
+    # /service/ 경로 - harbor-core 서비스로 연결
+    - kind: Rule
+      match: Host(`harbor.8ai.store`) && PathPrefix(`/service/`)
+      priority: 20
+      services:
+        - name: harbor-core
+          namespace: harbor
+          port: 80
+
+    # /v2/ 경로 - harbor-core 서비스로 연결
+    - kind: Rule
+      match: Host(`harbor.8ai.store`) && PathPrefix(`/v2/`)
+      priority: 20
+      services:
+        - name: harbor-core
+          namespace: harbor
+          port: 80
+
+    # /chartrepo/ 경로 - harbor-core 서비스로 연결
+    - kind: Rule
+      match: Host(`harbor.8ai.store`) && PathPrefix(`/chartrepo/`)
+      priority: 20
+      services:
+        - name: harbor-core
+          namespace: harbor
+          port: 80
+
+    # /c/ 경로 - harbor-core 서비스로 연결
+    - kind: Rule
+      match: Host(`harbor.8ai.store`) && PathPrefix(`/c/`)
+      priority: 20
+      services:
+        - name: harbor-core
+          namespace: harbor
+          port: 80
+
+    # /projects/ 경로 - harbor-core 서비스로 연결
+    - kind: Rule
+      match: Host(`harbor.8ai.store`) && PathPrefix(`/projects/`)
+      priority: 20
+      services:
+        - name: harbor-core
+          namespace: harbor
+          port: 80
+
+    # 기타 모든 경로 - harbor-portal 서비스로 연결
+    - kind: Rule
+      match: Host(`harbor.8ai.store`)
+      priority: 10
+      services:
+        - name: harbor-portal
+          namespace: harbor
+          port: 80
+
+    - kind: Rule
+      match: Host(`kyverno.8ai.store`)
+      priority: 10
+      services:
+        - name: policy-reporter-ui
+          namespace: kyverno
+          port: 8080
+
+    - kind: Rule
+      match: Host(`grafana.8ai.store`)
+      priority: 10
+      services:
+        - name: grafana
+          namespace: monitoring
+          port: 3000
+
+    - kind: Rule
+      match: Host(`nocodb.8ai.store`)
+      priority: 10
+      services:
+        - name: nocodb
+          namespace: nocodb
+          port: 8080
+
+    - kind: Rule
+      match: Host(`trivy.8ai.store`)
+      priority: 10
+      services:
+        - name: trivy-operator-dashboard
+          namespace: trivy
+          port: 8900
+
+    - kind: Rule
+      match: Host(`kuma.8ai.store`)
+      priority: 10
+      services:
+        - name: uptime-kuma
+          namespace: uptime-kuma
+          port: 3001
+
+    - kind: Rule
+      match: Host(`vault.8ai.store`)
+      priority: 10
+      services:
+        - name: vault-ui
+          namespace: vault
+          port: 8200
+    
+  tls:
+    secretName: godaddy-tls
+  # Include TLS configuration if Traefik is handling TLS2
