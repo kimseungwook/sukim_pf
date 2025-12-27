@@ -1,6 +1,0 @@
-kubectl create secret generic harborcred \
-  --from-file=.dockerconfigjson=./harbor/credencial/config.json \
-  --type=kubernetes.io/dockerconfigjson \
--n tekton-pipelines
-
-docker pull harbor.goyoai:30003/goyoai-web/nginx@sha256:9ceac672f55cdad7316651fcced0d6a1ba44e87454ec86236cb3bca647e419f6

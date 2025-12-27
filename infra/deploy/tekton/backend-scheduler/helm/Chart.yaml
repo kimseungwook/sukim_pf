@@ -1,6 +1,0 @@
-apiVersion: v2
-name: tekton-goyoai-web-back-portal-scheduler
-description: A Helm chart for Goyoai Web Back Portal Scheduller
-type: application
-version: 0.1.0
-appVersion: 1.16.0

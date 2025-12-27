@@ -1,6 +1,0 @@
-apiVersion: v2
-name: tekton-backend-system-v2
-description: A Helm chart for Goyoai Web Back v2
-type: application
-version: 2.0.0
-appVersion: 1.16.0
