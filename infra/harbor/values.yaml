@@ -36,8 +36,8 @@ persistence:
       bucket: harbor-bucket-sukim
 
       # S3 credentials from Secret
-      existingSecret: "harbor-secrets"
-
+      existingSecret: "harbor-registry-s3"
+      
       secure: true
       regionendpoint: cn7ipyag4bte.compat.objectstorage.ap-seoul-1.oraclecloud.com
 
