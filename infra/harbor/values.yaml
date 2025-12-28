@@ -19,9 +19,9 @@ expose:
       httpsPort: 443
 
 externalURL: https://harbor.8ai.store
-# internalTLS:
-#   enabled: true
-#   certSource: "auto"
+
+internalTLS:
+  enabled: false
 
 persistence:
   enabled: true
@@ -90,10 +90,10 @@ registry:
     image:
       repository: docker.io/goharbor/harbor-registryctl
       tag: v2.14.0
-  credentials:
-    # Registry credentials from Secret
-    existingSecret: "harbor-secrets"
-    username: "goyoai_harbor"
+  # credentials:
+  #   # Registry credentials from Secret
+  #   existingSecret: "harbor-secrets"
+  #   username: "goyoai_harbor"
   <<: *commonSettings
 
 trivy:

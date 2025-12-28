@@ -1,0 +1,110 @@
+# Dockerfile.backend
+# Optimized Dockerfile for ecommerce-react Go Backend
+# Optimized for OKE Virtual Node (Harbor Layer Cache only, no PVC)
+#
+# Usage: docker build -f Dockerfile.backend -t ecommerce-backend:latest .
+
+# ============================================================================
+# Dependencies Stage - Go 모듈 다운로드 (Layer Cache 활용)
+# ============================================================================
+FROM golang:1.24.1-alpine3.21 AS dependencies
+
+WORKDIR /app
+
+# ⭐ Step 1: Go 모듈 파일만 먼저 복사 (거의 변하지 않음)
+COPY go.mod go.sum ./
+
+# ⭐ Step 2: 의존성만 다운로드 (이 Layer는 go.mod/go.sum 변경 시에만 재빌드)
+RUN echo "=========================================" && \
+    echo "📦 Downloading Go Dependencies" && \
+    echo "=========================================" && \
+    echo "Module: ecommerce_clean" && \
+    echo "Go Version: $(go version)" && \
+    echo "=========================================" && \
+    echo "" && \
+    go mod download && \
+    go mod verify && \
+    echo "" && \
+    echo "✅ Dependencies downloaded successfully" && \
+    echo ""
+
+# ============================================================================
+# Builder Stage - 소스 컴파일 (소스 변경 시에만 재빌드)
+# ============================================================================
+FROM golang:1.24.1-alpine3.21 AS builder
+
+WORKDIR /app
+
+# ⭐ Step 3: 다운로드된 모듈 복사 (dependencies stage에서)
+COPY --from=dependencies /go/pkg /go/pkg
+
+# ⭐ Step 4: 소스코드 복사 (이 Layer는 소스 변경 시에만 재빌드)
+COPY . .
+
+# ⭐ Step 5: 빌드 실행
+RUN echo "=========================================" && \
+    echo "🔨 Building Go Application" && \
+    echo "=========================================" && \
+    echo "Module: ecommerce_clean" && \
+    echo "Output: /bin/app" && \
+    echo "=========================================" && \
+    echo "" && \
+    mkdir -p /bin && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-w -s" -o /bin/app ./cmd/app && \
+    echo "" && \
+    echo "=========================================" && \
+    echo "✅ Build Completed" && \
+    echo "=========================================" && \
+    ls -lh /bin/app && \
+    echo "=========================================" && \
+    echo "" && \
+    # 빌드 최적화: 불필요한 파일 제거
+    rm -rf /root/.cache/go-build 2>/dev/null || true && \
+    rm -rf /tmp/* 2>/dev/null || true
+
+# ============================================================================
+# Runtime Stage - 최종 실행 이미지 (경량화)
+# ============================================================================
+FROM alpine:3.21
+
+# 타임존 설정
+ENV TZ=Asia/Seoul
+RUN apk add --no-cache tzdata && \
+    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
+    echo $TZ > /etc/timezone
+
+WORKDIR /app
+
+# 필수 도구 설치 (헬스체크용 curl 포함)
+RUN apk add --no-cache \
+    ca-certificates \
+    curl
+
+# 빌드된 바이너리 복사
+COPY --from=builder /bin/app /app/app
+RUN chmod +x /app/app
+
+# 설정 파일 및 정책 파일 복사
+COPY --from=builder /app/policy /app/policy
+COPY --from=builder /app/configs /app/configs
+
+# Entrypoint 스크립트 복사 (있는 경우)
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# 헬스체크 (Kubernetes에서 사용)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8080/health || exit 1
+
+# 메타데이터
+LABEL maintainer="sukim-pf@example.com" \
+      description="Ecommerce React - Go Backend API" \
+      version="1.0" \
+      app="ecommerce-backend"
+
+# 포트 노출
+EXPOSE 8080
+
+# Entrypoint 실행
+ENTRYPOINT ["/entrypoint.sh"]

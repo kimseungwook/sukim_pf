@@ -1,0 +1,159 @@
+# Dockerfile.unified
+# Unified Dockerfile for all goyoai-backend-system modules
+# Optimized for Virtual Node (Harbor Layer Cache only)
+#
+# Usage: docker build --build-arg MODULE_NAME=goyoai-gointern-portal \
+#                      --build-arg BASE_IMAGE=openjdk:17-jdk-oraclelinux8 \
+#                      -f Dockerfile.unified . 
+
+ARG BASE_IMAGE=gdhb.goyoai.com/common/openjdk:17-jdk-oraclelinux8-otel-2.21.0
+
+# ============================================================================
+# Dependencies Stage - 의존성 다운로드 (Layer Cache 활용)
+# ============================================================================
+FROM gdhb.goyoai.com/common/gradle:8.11.0-jdk17-corretto AS dependencies
+
+ARG MODULE_NAME
+ARG GRADLE_WORKERS=12
+ARG GRADLE_MAX_MEMORY=5g
+
+WORKDIR /app
+
+# ⭐ Step 1: Gradle Wrapper 파일만 먼저 복사 (거의 변하지 않음)
+COPY gradle gradle
+COPY gradlew gradlew.bat ./
+
+# ⭐ Step 2: 빌드 스크립트 파일들만 복사 (의존성 정의)
+COPY build.gradle.kts settings.gradle.kts ./
+
+# 공통 모듈 build.gradle.kts만 복사
+# COPY goyoai-backend-common/build.gradle.kts goyoai-backend-common/
+COPY goyoai-common/build.gradle.kts goyoai-common/
+COPY goyoai-common-domain/build.gradle.kts goyoai-common-domain/
+COPY goyoai-common-service/build.gradle.kts goyoai-common-service/
+
+# 타겟 모듈 build.gradle.kts만 복사
+COPY ${MODULE_NAME}/build.gradle.kts ${MODULE_NAME}/
+
+# ⭐ Step 3: gradle.properties 생성 (최적화 설정)
+RUN cat > gradle.properties <<EOF
+# === JVM 메모리 설정 ===
+org.gradle.jvmargs=-Xmx${GRADLE_MAX_MEMORY} -Xms4g -XX:MaxMetaspaceSize=2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200
+kotlin.daemon.jvmargs=-Xmx40g -XX:+UseG1GC
+
+# === 병렬 빌드 설정 ===
+org.gradle.parallel=true
+org.gradle.workers.max=${GRADLE_WORKERS}
+org.gradle.daemon=false
+
+# === 캐싱 설정 ===
+org.gradle.caching=true
+org.gradle.configuration-cache=true
+org.gradle.configuration-cache.problems=warn
+
+# === Kotlin 최적화 ===
+kotlin.incremental=true
+kotlin.incremental.usePreciseJavaTracking=true
+kotlin.compiler.execution.strategy=in-process
+
+# === Kapt 최적화 ===
+kapt.use.worker.api=true
+kapt.incremental.apt=true
+kapt.include.compile.classpath=false
+
+# === 기타 ===
+org.gradle.vfs.watch=false
+org.gradle.welcome=never
+org.gradle.console=plain
+EOF
+
+# ⭐ Step 4: 의존성만 다운로드 (이 Layer는 build.gradle 변경 시에만 재빌드)
+RUN echo "=========================================" && \
+    echo "📦 Downloading Dependencies" && \
+    echo "=========================================" && \
+    echo "Module: ${MODULE_NAME}" && \
+    echo "Workers: ${GRADLE_WORKERS}" && \
+    echo "Memory: ${GRADLE_MAX_MEMORY}" && \
+    echo "=========================================" && \
+    echo "" && \
+    ./gradlew dependencies \
+    --no-daemon \
+    --parallel \
+    --max-workers=${GRADLE_WORKERS} \
+    --stacktrace && \
+    echo "" && \
+    echo "✅ Dependencies downloaded successfully" && \
+    echo ""
+
+# ============================================================================
+# Builder Stage - 소스 컴파일 (소스 변경 시에만 재빌드)
+# ============================================================================
+FROM dependencies AS builder
+
+ARG MODULE_NAME
+ARG GRADLE_WORKERS=12
+
+WORKDIR /app
+
+# ⭐ Step 5: 소스코드 복사 (이 Layer는 소스 변경 시에만 재빌드)
+# COPY goyoai-backend-common/src goyoai-backend-common/src
+COPY goyoai-common/src goyoai-common/src
+COPY goyoai-common-domain/src goyoai-common-domain/src
+COPY goyoai-common-service/src goyoai-common-service/src
+COPY ${MODULE_NAME}/src ${MODULE_NAME}/src
+
+# ⭐ Step 6: 빌드 실행
+RUN echo "=========================================" && \
+    echo "🔨 Building Module" && \
+    echo "=========================================" && \
+    echo "Module: ${MODULE_NAME}" && \
+    echo "Workers: ${GRADLE_WORKERS}" && \
+    echo "=========================================" && \
+    echo "" && \
+    ./gradlew :${MODULE_NAME}:bootJar \
+    -x test \
+    --no-daemon \
+    --parallel \
+    --max-workers=${GRADLE_WORKERS} \
+    --configuration-cache \
+    --build-cache \
+    --stacktrace && \
+    echo "" && \
+    echo "=========================================" && \
+    echo "✅ Build Completed" && \
+    echo "=========================================" && \
+    ls -lh /app/${MODULE_NAME}/build/libs/ && \
+    echo "=========================================" && \
+    echo "" && \
+    # 임시 파일 정리
+    rm -rf /tmp/hsperfdata_root/ && \
+    rm -rf /tmp/kotlin-daemon* && \
+    rm -rf /root/.kotlin/daemon && \
+    find /root/.gradle/caches -type f -name "*.lock" -delete 2>/dev/null || true
+
+# ============================================================================
+# Runtime Stage - 최종 실행 이미지
+# ============================================================================
+FROM ${BASE_IMAGE}
+
+ARG MODULE_NAME
+
+# 타임존 설정
+ENV TZ=Asia/Seoul
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+WORKDIR /app
+
+# 빌드된 JAR 파일 복사
+COPY --from=builder /app/${MODULE_NAME}/build/libs/*.jar /app/app.jar
+RUN chmod 644 /app/app.jar
+
+# 헬스체크 (선택사항)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8080/actuator/health || exit 1
+
+# 메타데이터
+LABEL module="${MODULE_NAME}" \
+      maintainer="goyoai-devops@goyoai.com" \
+      description="GoyoAI Backend System - ${MODULE_NAME}" \
+      version="1.0"
