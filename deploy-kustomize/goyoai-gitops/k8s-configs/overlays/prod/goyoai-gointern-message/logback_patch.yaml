@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: goyoai-gointern-message
+spec:
+  template:
+    spec:
+      containers:
+      - name: goyoai-gointern-message-container
+        env:
+        # logback 설정 파일 경로 환경 변수 추가
+        - name: LOGGING_CONFIG
+          value: "file:/app/logback/logback-spring.xml"
+        
+        volumeMounts:
+        # ✅ [수정] subPath를 제거하고 디렉터리로 마운트
+        - name: logback-config
+          mountPath: /app/logback
+          readOnly: true
+      
+      volumes:
+      # logback ConfigMap 볼륨 추가
+      - name: logback-config
+        configMap:
+          name: gointern-system-logback-config

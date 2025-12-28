@@ -1,0 +1,51 @@
+# overlays/prod/promtail_sidecar.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: goyoai-aify-system
+spec:
+  template:
+    spec:
+      containers:
+        - name: goyoai-aify-system-container
+          volumeMounts:
+            - name: heap-dumps
+              mountPath: /tmp
+            - name: app-logs
+              mountPath: /var/log/app
+
+        - name: promtail
+          image: gphb.goyoai.com/common/promtail:3.5.8
+          args:
+            - -config.file=/etc/promtail/promtail.yaml
+            - -log.level=info
+          ports:
+            - name: http-metrics
+              containerPort: 9080
+              protocol: TCP
+          volumeMounts:
+            - name: app-logs
+              mountPath: /var/log/app
+              readOnly: true
+            - name: promtail-config
+              mountPath: /etc/promtail
+            - name: promtail-tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+
+      volumes:
+        - name: heap-dumps
+          emptyDir: {}
+        - name: app-logs
+          emptyDir: {}
+        - name: promtail-config
+          configMap:
+            name: aify-system-promtail-config
+        - name: promtail-tmp
+          emptyDir: {}

@@ -1,15 +1,15 @@
 #!/bin/sh
 set -e
 
-echo "Waiting for MinIO to be ready..."
-until curl -s http://ecommerce.minio:9000/minio/health/live; do
+# MinIO endpoint from environment variable (supports docker-compose and K8s)
+MINIO_ENDPOINT="${MINIO_ENDPOINT:-ecommerce.minio:9000}"
+
+echo "Waiting for MinIO at ${MINIO_ENDPOINT}..."
+until curl -s http://${MINIO_ENDPOINT}/minio/health/live; do
+  echo "MinIO not ready, retrying in 2 seconds..."
   sleep 2
 done
 
-echo "Retrieving MinIO credentials..."
-export MINIO_ACCESSKEY="minioadmin"
-export MINIO_SECRETKEY="minioadmin123"
-
-echo "Starting application..."
+echo "MinIO is ready! Starting application..."
 exec "/app"
 

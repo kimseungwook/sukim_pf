@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: goyoai-aify-portal
+spec:
+  template:
+    spec:
+      containers:
+        - name: goyoai-aify-portal-container
+          command: ["/bin/bash"]
+          args:
+            - -c
+            - |
+              echo "=== Container Startup (Waiting for Vault) ==="
+
+              # 1. Vault Agent Sidecar가 시크릿 파일을 생성할 때까지 대기
+              while [ ! -f /vault/secrets/app.env ]; do
+                echo "Waiting for Vault secrets file (/vault/secrets/app.env)..."
+                sleep 2
+              done
+
+              echo "✅ Vault secrets file found. Sourcing environment variables..."
+
+              # 2. Vault 시크릿을 환경 변수로 로드
+              source /vault/secrets/app.env
+
+              echo "=== Starting Java Application with Vault Secrets ==="
+
+              # ✅ JAR 파일 확인
+              echo "--- Checking JAR file ---"
+              ls -lh /app/*.jar
+
+              # ✅ OTel Agent 확인
+              echo "--- Checking OTel Agent ---"
+              ls -lh /opt/opentelemetry-javaagent.jar || echo "⚠️  OTel Agent not found"
+
+              # # ✅ OTel Config 확인
+              # echo "--- Checking OTel Config ---"
+              # ls -lh /opt/otel-config/otel-config.properties || echo "⚠️  OTel Config not found"
+
+              echo "=== Starting Java Application ==="
+
+              exec java \
+                -javaagent:/opt/opentelemetry-javaagent.jar \
+                -Dotel.instrumentation.logback-appender.enabled=false \
+                -Dotel.instrumentation.logback-mdc.enabled=false \
+                -Dotel.instrumentation.netty.enabled=false \
+                -Dotel.instrumentation.lettuce.enabled=false \
+                -Dotel.instrumentation.reactor-netty.enabled=false \
+                -Dotel.instrumentation.reactor.enabled=false \
+                -Dotel.instrumentation.spring-data.enabled=false \
+                -Dspring.application.name=goyoai-aify-portal-app \
+                -Dspring.profiles.active=prod \
+                -Xms2048m \
+                -Xmx2048m \
+                -XX:+HeapDumpOnOutOfMemoryError \
+                -XX:HeapDumpPath=/tmp/heapdump.hprof \
+                -XX:+UseG1GC \
+                -XX:MaxGCPauseMillis=200 \
+                -jar /app/app.jar
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "goyoai-aify-portal-app"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.name=goyoai-aify-portal-app,service.namespace=goyoai-web,deployment.environment=prod"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://aify-otel-collector.otlp.svc.cluster.local:4317"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "grpc"
+            - name: OTEL_PROPAGATORS
+              value: "tracecontext"
+            - name: OTEL_TRACES_SAMPLER
+              value: "parentbased_always_on"
+            - name: OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_REQUEST
+              value: ".*"
+            - name: OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_RESPONSE
+              value: ".*"
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+            - name: SPRING_FLYWAY_BASELINE_ON_MIGRATE
+              value: "true"
+            # ✅ ConfigMap 대신 내장 설정 사용
+            # - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+            #   value: "/app/config/application-prod.yml"
+
+            - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+              value: "file:/app/config/application-prod.yml"
+            # - name: LOGGING_CONFIG
+            #   value: "file:/app/logback/logback-spring.xml"
+      #     volumeMounts:
+      #       - name: heap-dumps
+      #         mountPath: /tmp
+      #       # ✅ app-config 마운트 제거 (리소스의 application-prod.yml 사용)
+      #       # - name: app-config
+      #       #   mountPath: /app/config
+      #       - name: logback-config
+      #         mountPath: /app/logback
+      #         readOnly: true
+      # volumes:
+      #   - name: vault-secrets
+      #     mountPath: /vault/secrets
+      #     readOnly: true # 앱 컨테이너는 읽기만 함
+      #   - name: heap-dumps
+      #     emptyDir: {}
+      #   # ✅ app-config 볼륨 제거
+      #   # - name: app-config
+      #   #   configMap:
+      #   #     name: gointern-backend-config
+      #   - name: logback-config
+      #     configMap:
+      #       name: gointern-logback-config

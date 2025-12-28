@@ -1,0 +1,6 @@
+apiVersion: v2
+name: goyoai-frontend-web
+description: A Helm chart for Goyoai Web Frontend v2
+type: application
+version: 0.1.3
+appVersion: 1.16.0

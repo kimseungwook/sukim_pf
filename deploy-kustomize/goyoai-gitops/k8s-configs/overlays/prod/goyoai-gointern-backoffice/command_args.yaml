@@ -1,0 +1,119 @@
+# goyoai-gitops\k8s-configs\overlays\prod\goyoai-gointern-backoffice\command_args.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: goyoai-gointern-backoffice
+spec:
+  template:
+    spec:
+      containers:
+        - name: goyoai-gointern-backoffice-container
+          command: ["/bin/bash"]
+          args:
+            - -c
+            - |
+              echo "=== Container Startup (Waiting for Vault) ==="
+
+              # 1. Vault Agent Sidecar가 시크릿 파일을 생성할 때까지 대기
+              while [ ! -f /vault/secrets/app.env ]; do
+                echo "Waiting for Vault secrets file (/vault/secrets/app.env)..."
+                sleep 2
+              done
+
+              echo "✅ Vault secrets file found. Sourcing environment variables..."
+
+              # 2. Vault 시크릿을 환경 변수로 로드
+              source /vault/secrets/app.env
+
+              echo "=== Vault Secrets Debug ==="
+              echo "OCI_TENANCY length: ${#OCI_TENANCY}"
+              echo "OCI_OCID length: ${#OCI_OCID}"
+              echo "OCI_FINGERPRINT: $OCI_FINGERPRINT"
+              echo "OCI_API_KEY length: ${#OCI_API_KEY}"
+              echo "OCI_API_KEY first 100 chars:"
+              echo "$OCI_API_KEY" | head -c 100
+              echo ""
+              echo "OCI_API_KEY last 100 chars:"
+              echo "$OCI_API_KEY" | tail -c 100
+              echo ""
+
+              # Base64 디코딩 테스트
+              echo "=== Base64 Decode Test ==="
+              if echo "$OCI_API_KEY" | base64 -d > /tmp/decoded_key.pem 2>/dev/null; then
+                echo "✅ Base64 decode successful"
+                echo "Decoded key first 200 chars:"
+                head -c 200 /tmp/decoded_key.pem
+                echo ""
+                echo "Decoded key last 200 chars:"
+                tail -c 200 /tmp/decoded_key.pem
+                echo ""
+                if grep -q "BEGIN PRIVATE KEY" /tmp/decoded_key.pem; then
+                  echo "✅ Contains BEGIN PRIVATE KEY marker"
+                else
+                  echo "❌ Does NOT contain BEGIN PRIVATE KEY marker"
+                fi
+                if grep -q "END PRIVATE KEY" /tmp/decoded_key.pem; then
+                  echo "✅ Contains END PRIVATE KEY marker"
+                else
+                  echo "❌ Does NOT contain END PRIVATE KEY marker"
+                fi
+                rm -f /tmp/decoded_key.pem
+              else
+                echo "❌ Base64 decode failed - API Key might not be Base64 encoded"
+                echo "Trying to use raw key..."
+                echo "Raw key first 200 chars:"
+                echo "$OCI_API_KEY" | head -c 200
+                echo ""
+              fi
+
+              echo "=== Starting Java Application with Vault Secrets ==="
+
+              # ✅ JAR 파일 확인 
+              echo "--- Checking JAR file ---"
+              ls -lh /app/*.jar
+
+              # ✅ OTel Agent 확인
+              echo "--- Checking OTel Agent ---"
+              ls -lh /opt/opentelemetry-javaagent.jar || echo "⚠️  OTel Agent not found"
+
+              echo "=== Starting Java Application ==="
+
+              exec java \
+                -javaagent:/opt/opentelemetry-javaagent.jar \
+                -Dotel.instrumentation.logback-appender.enabled=false \
+                -Dotel.instrumentation.logback-mdc.enabled=false \
+                -Dotel.instrumentation.netty.enabled=false \
+                -Dotel.instrumentation.lettuce.enabled=false \
+                -Dotel.instrumentation.reactor-netty.enabled=false \
+                -Dotel.instrumentation.reactor.enabled=false \
+                -Dotel.instrumentation.spring-data.enabled=false \
+                -Dspring.application.name=goyoai-gointern-backoffice-app \
+                -Dspring.profiles.active=prod \
+                -Xms2048m \
+                -Xmx2048m \
+                -XX:+HeapDumpOnOutOfMemoryError \
+                -XX:HeapDumpPath=/tmp/heapdump.hprof \
+                -XX:+UseG1GC \
+                -XX:MaxGCPauseMillis=200 \
+                -jar /app/app.jar
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: "goyoai-gointern-backoffice-app"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.name=goyoai-gointern-backoffice-app,service.namespace=goyoai-web,deployment.environment=prod"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://gointern-otel-collector.otlp.svc.cluster.local:4317"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "grpc"
+            - name: OTEL_PROPAGATORS
+              value: "tracecontext"
+            - name: OTEL_TRACES_SAMPLER
+              value: "parentbased_always_on"
+            - name: OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_REQUEST
+              value: ".*"
+            - name: OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_RESPONSE
+              value: ".*"
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+            - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+              value: "file:/app/config/application-prod.yml"

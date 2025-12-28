@@ -1,0 +1,9 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: goyoai-gointern-bo-web-pdb
+spec:
+  maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: goyoai-gointern-bo-web-app

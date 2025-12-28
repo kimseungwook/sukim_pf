@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gointern-message-application-config
+data:
+  application-prod.yml: |
+    logging.config: classpath:logback-spring-prod.xml
+
+    spring:
+      datasource:
+        url: ${POSTGRESQL_URL}
+        username: ${POSTGRESQL_USERNAME}
+        password: ${POSTGRESQL_PASSWORD}
+        hikari:
+          connectionTimeout: 30000
+          maximumPoolSize: 5
+          maxLifetime: 1800000
+          poolName: HikariCP
+          readOnly: false
+      data:
+        redis:
+          host: ${REDIS_HOST}
+          port: ${REDIS_PORT}
+          # password: ${REDIS_PW}
+          timeout: 10m
+          lettuce:
+            pool:
+              max-active: 8
+              max-idle: 8
+              min-idle: 4
+              max-wait: 5s
+
+    queue:
+      messages:
+        nameSpace: "queue:messages:"
+        groupName: "message-server"
+        streamKey:
+          individual: "individual"
+          group: "group"
+
+    cryptography:
+      privacy:
+        password: ${CRYPTO_PRIVACY_PASSWORD}
+        salt: ${CRYPTO_PRIVACY_SALT}
+        iv: ${CRYPTO_PRIVACY_IV}
+
+    logging:
+      level:
+        root: info
+        org.springframework: debug
+        com.google.api.client: debug
+        com.google.firebase: debug
+
+    external:
+      slack:
+        webhook-url: ${SLACK_WEBHOOK_URL}
+        webhook-critical-url: ${SLACK_WEBHOOK_CRITICAL_URL}
+
+    # Management Port 설정 (Actuator - 표준 설정 추가)
+    management:
+      server:
+        port: 9292
+      endpoints:
+        web:
+          exposure:
+            include: health,prometheus,metrics
+          base-path: /actuator
+      endpoint:
+        health:
+          show-details: when-authorized
+          probes:
+            enabled: true
+          prometheus:
+            enabled: true
+      metrics:
+        tags:
+          application: ${spring.application.name}
+          environment: prod
+          cluster: prod
+        distribution:
+          percentiles-histogram:
+            http:
+              server:
+                requests: true
+          minimum-expected-value: 
+            http.server.requests: 5ms
+          maximum-expected-value:
+            http.server.requests: 1000ms
+        enable:
+          all: true

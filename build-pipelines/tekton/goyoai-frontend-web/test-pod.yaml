@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-capacity-test2
+  namespace: tekton-pipelines # Kaniko Job과 동일한 네임스페이스
+spec:
+  # --- Virtual Node 할당 조건 ---
+  nodeSelector:
+    workload-type: tekton-build
+  tolerations:
+  - key: workload
+    operator: Equal
+    value: tekton-build
+    effect: NoSchedule
+  # ------------------------------
+  
+  restartPolicy: Never
+  containers:
+  - name: nginx-test-container
+    image: nginx:latest # ⬅️ Nginx 이미지 사용
+    
+    # --- 1CPU / 2Gi 리소스 요청 ---
+    resources:
+      requests:
+        memory: "8Gi"
+        cpu: "3000m"
+      limits:
+        memory: "8Gi"
+        cpu: "3000m"
+  # ------------------------------

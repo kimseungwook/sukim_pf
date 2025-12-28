@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: goyoai-aify-web
+spec:
+  template:
+    spec:
+      containers:
+        - name: goyoai-aify-web-container
+          command: ["node"]
+          args: ["apps/goyoai-aify-web/server.js"]
+
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: LOG_LEVEL
+              value: "debug"
+            - name: AMPLITUDE_SECRET_KEY
+              value: "b1906c1680ee9a568837db871d592b63"
+            - name: MICROSOFT_CLIENT_ID
+              value: "4474427e-fe0c-481a-a9c8-e444734c0aba"
+            - name: MICROSOFT_CLIENT_SECRET
+              value: "mAh8Q~DoMSIVIk8xyDJ700aMxzQp_6WmRB602dpS"
+            - name: NEXTAUTH_SECRET
+              value: "IoR2m4RlqmyeBcwSLo3J/sOGgCCJ2RR5WoBvMMMx6p0="
+            - name: NEXTAUTH_URL
+              value: "https://aify.goyoai.com"
+            - name: GOOGLE_CLIENT_ID
+              value: "846882866328-c22l32jltosb71mgat1ui1vu5m7vuupd.apps.googleusercontent.com"
+            - name: GOOGLE_CLIENT_SECRET
+              value: "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"
+            - name: NAVER_CLIENT_ID
+              value: "CMcJiifTB55dVKyivu34"
+            - name: NAVER_CLIENT_SECRET
+              value: "96REJ5VSry"
+            - name: KAKAO_CLIENT_ID
+              value: "4426e808007d5875b126bffb76774649"
+            - name: KAKAO_CLIENT_SECRET
+              value: "fcU6uaXv2xloAFn7neKDlAuJwuABHBAr"

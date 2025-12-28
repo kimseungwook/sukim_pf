@@ -1,0 +1,88 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: ecommerce-pg
+  namespace: cloudnative-pg
+spec:
+  # PostgreSQL 인스턴스 수 (Portfolio용 - 단일 인스턴스)
+  instances: 1
+  
+  # PostgreSQL 버전
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.2
+  
+  # Bootstrap
+  bootstrap:
+    initdb:
+      database: ecommerce_clean
+      owner: ecommerce_user
+      secret:
+        name: ecommerce-pg-app
+  
+  # Superuser Secret
+  superuserSecret:
+    name: ecommerce-pg-superuser
+  
+  # Storage (Portfolio용 - 최소 사양)
+  storage:
+    storageClass: oci-bv
+    size: 10Gi  # Ecommerce 데이터용
+  
+  # Resources (Portfolio용 - 최소 사양)
+  resources:
+    requests:
+      memory: "256Mi"  # 최소 메모리
+      cpu: "250m"      # 최소 CPU
+    limits:
+      memory: "512Mi"  # 제한
+      cpu: "500m"
+  
+  # Node Affinity
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: service
+                operator: In
+                values:
+                  - tools
+  
+  # PostgreSQL Configuration (최소 사양 최적화)
+  postgresql:
+    parameters:
+      max_connections: "100"              # 100으로 충분
+      shared_buffers: "128MB"             # 메모리 절약
+      effective_cache_size: "384MB"       # 메모리에 맞춤
+      maintenance_work_mem: "32MB"        # 최소화
+      checkpoint_completion_target: "0.9"
+      wal_buffers: "8MB"                  # 최소화
+      default_statistics_target: "100"
+      random_page_cost: "1.1"
+      effective_io_concurrency: "200"
+      work_mem: "2621kB"
+      min_wal_size: "512MB"               # 최소화
+      max_wal_size: "1GB"                 # 최소화
+  
+  # Monitoring - PostgreSQL Cluster 메트릭 수집 활성화
+  monitoring:
+    enablePodMonitor: true
+    # ConfigMap을 참조하여 커스텀 쿼리 사용 (cnpg-default-monitoring)
+    customQueriesConfigMap:
+      - name: cnpg-default-monitoring
+        key: queries
+  
+  # Backup (선택사항 - Portfolio에서는 비활성화)
+  # backup:
+  #   barmanObjectStore:
+  #     destinationPath: s3://my-bucket/backup
+  #     s3Credentials:
+  #       accessKeyId:
+  #         name: backup-credentials
+  #         key: ACCESS_KEY_ID
+  #       secretAccessKey:
+  #         name: backup-credentials
+  #         key: SECRET_ACCESS_KEY
+  #     wal:
+  #       compression: gzip
+  #   retentionPolicy: "7d"  # Portfolio용이면 7일로 충분

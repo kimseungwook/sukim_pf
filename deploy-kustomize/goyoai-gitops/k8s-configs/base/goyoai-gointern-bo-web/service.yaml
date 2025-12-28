@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: goyoai-gointern-bo-web
+  labels:
+    app.kubernetes.io/component: goyoai-gointern-bo-web-generator
+    app.kubernetes.io/instance: goyoai-gointern-bo-web-generator
+    app.kubernetes.io/part-of: goyoai-gointern-bo-web-generator
+spec:
+  type: ClusterIP
+  selector:
+    app: goyoai-gointern-bo-web-app
+  ports:
+  - port: 5000
+    targetPort: 3000

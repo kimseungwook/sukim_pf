@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: goyoai-aify-web
+spec:
+  template:
+    spec:
+      containers:
+        - name: goyoai-aify-web-container
+          # 기존 command/args 대신 이렇게 수정
+          command: ["/bin/sh"]
+          args:
+            - -c
+            - |
+              # stdout과 stderr를 파일로도 리다이렉트 (tee 사용)
+              node apps/goyoai-aify-web/server.js 2>&1 | tee -a /var/log/app/application.log
+          volumeMounts:
+            - name: heap-dumps
+              mountPath: /tmp
+            - name: app-logs
+              mountPath: /var/log/app
+        
+        - name: promtail
+          image: gphb.goyoai.com/common/promtail:3.5.8
+          args:
+            - -config.file=/etc/promtail/promtail.yaml
+            - -log.level=info
+          ports:
+            - name: http-metrics
+              containerPort: 9080
+              protocol: TCP
+          volumeMounts:
+            - name: app-logs
+              mountPath: /var/log/app
+              readOnly: true
+            - name: promtail-config
+              mountPath: /etc/promtail
+            - name: promtail-tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+      
+      volumes:
+        - name: heap-dumps
+          emptyDir: {}
+        - name: app-logs
+          emptyDir: {}
+        - name: promtail-config
+          configMap:
+            name: goyoai-aify-web-promtail-config
+        - name: promtail-tmp
+          emptyDir: {}

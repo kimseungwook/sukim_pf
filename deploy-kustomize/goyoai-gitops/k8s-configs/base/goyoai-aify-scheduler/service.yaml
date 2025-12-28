@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: goyoai-aify-scheduler-app
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/actuator/prometheus"
+    prometheus.io/port: "9292"
+  labels:
+    app: goyoai-aify-scheduler-app
+    app.kubernetes.io/component: goyoai-aify-scheduler-generator
+    app.kubernetes.io/instance: goyoai-aify-scheduler-generator
+    app.kubernetes.io/part-of: goyoai-aify-scheduler-generator
+spec:
+  type: ClusterIP
+  selector:
+    app: goyoai-aify-scheduler-app
+  ports:
+  - name: metrics 
+    port: 9292
+    targetPort: 9292
+    protocol: TCP

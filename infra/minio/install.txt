@@ -1,0 +1,145 @@
+# =============================================================================
+# MinIO Installation Guide - CloudPirates Helm Chart
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Step 1: 차트 정보 확인 (선택사항)
+# -----------------------------------------------------------------------------
+# CloudPirates MinIO는 OCI Registry를 사용합니다
+# helm show chart oci://registry-1.docker.io/cloudpirates/minio --version 0.6.0
+# helm show values oci://registry-1.docker.io/cloudpirates/minio --version 0.6.0
+
+# -----------------------------------------------------------------------------
+# Step 2: Namespace 생성
+# -----------------------------------------------------------------------------
+kubectl create namespace minio
+
+# -----------------------------------------------------------------------------
+# Step 3: Secret 생성 (먼저 실행)
+# -----------------------------------------------------------------------------
+# 1. minio-secret.yaml 파일에서 root-password를 강력한 암호로 변경
+# 2. Secret 적용
+kubectl apply -f minio/minio-secret.yaml
+
+# Secret 확인
+kubectl get secret minio-secret -n minio
+kubectl describe secret minio-secret -n minio
+
+# Secret 내용 확인 (디버깅용)
+# kubectl get secret minio-secret -n minio -o jsonpath='{.data.root-user}' | base64 -d
+# kubectl get secret minio-secret -n minio -o jsonpath='{.data.root-password}' | base64 -d
+
+# -----------------------------------------------------------------------------
+# Step 4: MinIO 설치
+# -----------------------------------------------------------------------------
+# CloudPirates MinIO는 OCI Registry 형식을 사용합니다
+helm upgrade --install minio oci://registry-1.docker.io/cloudpirates/minio \
+  --version 0.6.0 \
+  -f minio/values.yaml \
+  -n minio \
+  --create-namespace
+
+# -----------------------------------------------------------------------------
+# Step 5: 설치 확인
+# -----------------------------------------------------------------------------
+kubectl get pods -n minio
+kubectl get svc -n minio
+kubectl get pvc -n minio
+
+# Pod 로그 확인
+kubectl logs -n minio -l app=minio -f
+
+# MinIO Pod 상태 확인
+kubectl describe pod -n minio -l app=minio
+
+# -----------------------------------------------------------------------------
+# Step 6: MinIO 접속 정보 확인
+# -----------------------------------------------------------------------------
+# ClusterIP로 설정되어 있으므로 Port Forward로 접속 테스트
+# API 접속 (9000)
+kubectl port-forward -n minio svc/minio 9000:9000
+
+# Console 접속 (9090)
+kubectl port-forward -n minio svc/minio 9090:9090
+
+# 브라우저에서 접속:
+# - API: http://localhost:9000
+# - Console: http://localhost:9090
+
+# 로그인 정보는 minio-secret에서 확인
+
+# -----------------------------------------------------------------------------
+# Step 7: Traefik IngressRoute 설정 (선택사항)
+# -----------------------------------------------------------------------------
+# Traefik을 사용하는 경우, IngressRoute를 생성하여 외부 접속 가능하게 설정
+# minio/ingress_route/ 디렉토리에 IngressRoute YAML 파일 생성
+
+# -----------------------------------------------------------------------------
+# Step 8: 기본 버킷 확인
+# -----------------------------------------------------------------------------
+# values.yaml에 정의한 기본 버킷 생성 확인
+# - tekton-artifacts
+# - harbor-storage
+# - backup
+
+# MinIO Client (mc) 설치 및 사용
+# kubectl run -it --rm mc --image=minio/mc --restart=Never -n minio -- \
+#   mc alias set myminio http://minio:9000 admin your-password
+# kubectl run -it --rm mc --image=minio/mc --restart=Never -n minio -- \
+#   mc ls myminio
+
+# -----------------------------------------------------------------------------
+# 업그레이드
+# -----------------------------------------------------------------------------
+helm upgrade minio oci://registry-1.docker.io/cloudpirates/minio \
+  --version 0.6.0 \
+  -f minio/values.yaml \
+  -n minio
+
+# 릴리즈 히스토리 확인
+helm history minio -n minio
+
+# 이전 버전으로 롤백 (필요시)
+# helm rollback minio [REVISION] -n minio
+
+# -----------------------------------------------------------------------------
+# 삭제
+# -----------------------------------------------------------------------------
+# WARNING: 모든 데이터가 삭제됩니다!
+helm uninstall minio -n minio
+kubectl delete secret minio-secret -n minio
+kubectl delete pvc -n minio --all
+kubectl delete namespace minio
+
+# -----------------------------------------------------------------------------
+# 트러블슈팅
+# -----------------------------------------------------------------------------
+# 1. Pod가 시작되지 않는 경우
+kubectl describe pod -n minio -l app=minio
+kubectl logs -n minio -l app=minio --previous
+
+# 2. PVC가 Pending 상태인 경우
+kubectl describe pvc -n minio
+
+# 3. Secret이 제대로 마운트되지 않는 경우
+kubectl get secret minio-secret -n minio -o yaml
+
+# 4. 버킷 초기화 Job 로그 확인
+kubectl get jobs -n minio
+kubectl logs -n minio job/minio-post-job
+
+# 5. Helm 차트 값 확인
+helm get values minio -n minio
+helm get manifest minio -n minio
+
+# -----------------------------------------------------------------------------
+# 유용한 명령어
+# -----------------------------------------------------------------------------
+# MinIO Pod에서 직접 명령 실행 (디버깅)
+# kubectl exec -it -n minio <minio-pod-name> -- /bin/sh
+
+# MinIO 버전 확인
+# kubectl exec -it -n minio <minio-pod-name> -- minio --version
+
+# 환경 변수 확인
+# kubectl exec -it -n minio <minio-pod-name> -- env | grep MINIO

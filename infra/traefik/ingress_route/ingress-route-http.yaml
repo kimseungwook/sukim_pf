@@ -97,6 +97,26 @@ spec:
           port: 3001
 
     - kind: Rule
+      match: Host(`minio.8ai.store`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: minio
+          namespace: minio
+          port: 9090
+
+    - kind: Rule
+      match: Host(`minio-api.8ai.store`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: minio
+          namespace: minio
+          port: 9000
+
+    - kind: Rule
       match: Host(`vault.8ai.store`)
       middlewares:
         - name: redirect-http-https

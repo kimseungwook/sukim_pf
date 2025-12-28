@@ -32,3 +32,4 @@ terraform.rc
 **/report_secret.yaml
 **/dex_secret.yaml
 **/authentik_secret.yaml
+**/minio-secret.yaml

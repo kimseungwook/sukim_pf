@@ -1,0 +1,249 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aify-portal-application-config
+data:
+  application-prod.yml: |
+    # logback 설정 경로를 ConfigMap 마운트 경로로 변경
+    logging.config: classpath:logback-spring-prod.xml
+
+    server:
+      port: 9293
+      servlet:
+        session:
+          cookie:
+            name: SESSION-AIFY-AUTH
+            same-site: None
+            secure: true
+            domain: goyoai.com
+
+    spring:
+      datasource:
+        url: ${POSTGRESQL_URL}
+        username: ${POSTGRESQL_USERNAME}
+        password: ${POSTGRESQL_PASSWORD}
+        hikari:
+          connectionTimeout: 30000  # 연결을 얻기 위한 대기 시간을 30초로 설정 (기본값은 30초)
+          maximumPoolSize: 5        # 하루 100명 미만 사용 (최적화됨)
+          minimumIdle: 2            # 최소 2개 연결 유지
+          idleTimeout: 600000       # 유휴 연결 타임아웃 10분
+          maxLifetime: 1800000      # 커넥션의 최대 생명 주기를 30분으로 유지 (기본값 30분)
+          poolName: HikariCP        # 풀 이름을 지정
+          readOnly: false           # 쓰기 작업이 필요하므로 읽기 전용을 false로 설정
+          leak-detection-threshold: 60000  # 커넥션 누수 감지를 위한 시간을 60초로 설정
+          data-source-properties:
+            rewriteBatchedStatements: true # 여러개의 insert 쿼리를 하나의 쿼리로 변환하여 성능 향상
+      data:
+        redis:
+          host: ${REDIS_HOST}
+          port: ${REDIS_PORT}
+          # password: ${REDIS_PW}
+          lettuce:
+            pool:
+              max-active: 20
+              max-idle: 10
+              min-idle: 5
+              max-wait: 5s
+      cloud:
+        openFeign:
+          client:
+            config:
+              default:
+                loggerLevel: full
+
+    oauth:
+      email:
+        ismatch: no
+
+      redirect-uri:
+        # [수정] 이 값들은 Vault에 없는 환경별 설정이므로, 변수 대신 하드코딩합니다.
+        web-full: https://www.goyoai.com/setting/callback
+        web-full-error: https://www.goyoai.com/setting/error
+        web-path: /setting/callback
+        web-path-error: /setting/error
+
+      atlassian:
+        auth_host_url: https://auth.atlassian.com
+        api_host: api.atlassian.com
+        confluence_scope: offline_access read:me read:account read:user:confluence read:space:confluence read:comment:confluence read:confluence-space.summary read:confluence-props read:confluence-content.all read:confluence-content.summary search:confluence read:confluence-content.permission read:confluence-user read:confluence-groups readonly:content.attachment:confluence read:page:confluence read:configuration:confluence
+        confluence_api_middle: /ex/confluence
+        jira_scope: offline_access read:me read:account read:jira-work read:jira-user read:issue:jira read:issue:jira-software read:issue.watcher:jira read:issue-type.property:jira read:issue-type-screen-scheme:jira read:issue-type-scheme:jira read:issue-type:jira read:issue-security-scheme:jira read:issue-details:jira read:issue.remote-link:jira read:issue.property:jira read:issue-link-type:jira read:issue-link:jira read:issue-meta:jira read:issue-event:jira read:dashboard:jira read:project:jira read:project.property:jira read:user:jira read:application-role:jira read:avatar:jira read:group:jira read:issue-type-hierarchy:jira read:project-category:jira read:project-version:jira read:project.component:jira read:field-configuration:jira
+        jira_api_middle: /ex/jira
+        client_id: ${ATLASSIAN_CLIENT_ID}
+        client_secret: ${ATLASSIAN_CLIENT_SECRET}
+        redirect_uri: ${ATLASSIAN_REDIRECT_URI}
+        old_search_time: "2021-01-01 01:00"
+        client_redirect_path:
+          jira: /setting/jira/callback
+          confluence: /setting/confluence/callback
+
+      monday:
+        auth_url: https://auth.monday.com/oauth2/authorize?client_id=
+        install_url: https://auth.monday.com/oauth2/authorize?response_type=install&client_id=
+        client_id: ${MONDAY_CLIENT_ID}
+        client_secret: ${MONDAY_CLIENT_SECRET}
+        base_url: https://api.monday.com/v2
+        authentication_token_url: https://auth.monday.com/oauth2/token
+        redirect_uri: ${MONDAY_REDIRECT_URI}
+        old_search_time: "2021-01-01 01:00:00"
+        scope:
+
+      azure:
+        object_id: ${AZURE_OBJECT_ID}
+        client_id: ${AZURE_CLIENT_ID}
+        client_secret: ${AZURE_CLIENT_SECRET}
+        tenant_id: ${AZURE_TENANT_ID}
+        login_uri: https://login.microsoftonline.com
+        auth_uri: https://login.microsoftonline.com/common/oauth2/v2.0/authorize
+        redirect_uri: ${AZURE_REDIRECT_URI}
+        sharepoint_uri: https://__TENANT_NAME__-my.sharepoint.com
+        sharepoint_uri_replace_str: __TENANT_NAME__
+        notification_uri: ${AZURE_NOTIFICATION_URI} # localhost 불가능 각자 로컬 ngrok 넣어야 함
+        notification_setting:
+          mail:
+            change_type: created,updated,deleted
+            resource: me/mailFolders('Inbox')/messages
+            expiration_minute: 10070 # MS 메일 구독 신청시 10070분 후에 구독 만료 설정
+          calendar:
+            change_type: created,updated,deleted
+            resource: me/events
+            expiration_minute: 10070 # MS 이벤트 구독 신청시 10070분 후에 구독 만료 설정
+
+      gcp:
+        api_key: ${GOOGLE_API_KEY}
+        client_id: ${GOOGLE_CLIENT_ID}
+        client_secret: ${GOOGLE_CLIENT_SECRET}
+        login_uri: https://accounts.google.com/o/oauth2/v2/auth
+        auth_uri: https://oauth2.googleapis.com/token
+        redirect_uri: ${GOOGLE_REDIRECT_URI}
+        subscription_topic: projects/aify-459101/topics/goyoai-aify-prod-topic
+        subscription_webhook_uri: ${GOOGLE_SUBSCRIPTION_WEBHOOK_URI}
+
+      figma:
+        auth_host_url: https://www.figma.com
+        api_host: api.figma.com
+        client_id: ${FIGMA_CLIENT_ID}
+        client_secret: ${FIGMA_CLIENT_SECRET}
+        scope: files:read file_variables:read file_variables:write file_comments:write library_analytics:read
+        redirect_uri: ${FIGMA_REDIRECT_URI}
+
+      slack:
+        #    auth_host_url: https://slack-gov.com #/oauth/v2/authorize
+        auth_host_url: https://slack.com #/oauth/v2/authorize
+        api_host: slack.com #/api/oauth.v2.access
+        # goyoaidev@goyoai.com google login
+        app_id: ${SLACK_APP_ID}
+        client_id: ${SLACK_CLIENT_ID}
+        client_secret: ${SLACK_CLIENT_SECRET}
+        scope: # this is for bot
+        #    user_scope: channels:read,channels:write,users:read,users:read.email,users:write
+        user_scope: channels:history,channels:read,channels:write,channels:write.topic,chat:write,groups:history,groups:read,groups:write,groups:write.topic,im:history,im:read,im:write,mpim:history,mpim:read,mpim:write,mpim:write.topic,reactions:read,reactions:write,team:read,users:read,users:read.email,users:write,emoji:read,files:read
+        redirect_uri: ${SLACK_REDIRECT_URI}
+
+      notion:
+        auth_host_url: https://api.notion.com
+        api_host: api.notion.com
+        client_id: ${NOTION_CLIENT_ID}
+        client_secret: ${NOTION_CLIENT_SECRET}
+        redirect_uri: ${NOTION_REDIRECT_URI}
+
+      zoom:
+        auth_host_url: https://zoom.us # /authorize
+        api_host: api.zoom.us # /v2/
+        client_id: ${ZOOM_CLIENT_ID}
+        client_secret: ${ZOOM_CLIENT_SECRET}
+        redirect_uri: ${ZOOM_REDIRECT_URI}
+        scope: user:read:user,email:read:profile,meeting:read:local_recording_token,meeting:read:summary,meeting:read:participant,meeting:read:list_meetings,meeting:read:meeting,meeting:read:chat_message,meeting:read:invitation,meeting:read:alert,meeting:read:live_streaming_token,cloud_recording:read:registrant,cloud_recording:read:recording,archiving:read:list_archived_files,team_chat:read:list_user_sessions,team_chat:read:list_user_messages,team_chat:read:user_message,user:read:email,user:read:settings,user:read:personal_note,user:read:presence_status
+
+      dropbox:
+        auth_host_url: https://www.dropbox.com # /oauth2/authorize
+        api_host: api.dropboxapi.com # /oauth2/token  /2/users/get_current_account
+        client_id: ${DROPBOX_CLIENT_ID}
+        client_secret: ${DROPBOX_CLIENT_SECRET}
+        redirect_uri: ${DROPBOX_REDIRECT_URI}
+        scope:
+
+    internal:
+      api-main:
+        host: ${INTERNAL_API_HOST}
+        api-key: ${INTERNAL_API_KEY}
+        secret-key: ${INTERNAL_SECRET_KEY}
+
+    external:
+      naver:
+        stock:
+          api: https://m.stock.naver.com
+          api-foreign: https://api.stock.naver.com
+      kakao:
+        local:
+          api: https://dapi.kakao.com/v2/local
+          api-key: ${KAKAO_API_KEY}
+      microsoft:
+        graph:
+          api: https://graph.microsoft.com
+      google:
+        oauth2:
+          api: https://oauth2.googleapis.com
+        news:
+          api: https://news.google.com/rss
+      weather:
+        api: https://apihub.kma.go.kr/api
+        authKey: ${WEATHER_AUTH_KEY}
+      data-go-kr:
+        scheme: https
+        host: apis.data.go.kr
+        serviceKey: ${DATA_GO_KR_SERVICE_KEY}
+        stock:
+          uriPath: /1160100/service/GetKrxListedInfoService/getItemInfo
+          req:
+            resultType: json
+            numOfRows: 1
+      slack:
+        webhook-url: ${SLACK_WEBHOOK_URL}
+        webhook-critical-url: ${SLACK_WEBHOOK_CRITICAL_URL}
+
+    cors:
+      origins: https://*.goyoai.com
+
+    cryptography:
+      default:
+        secret-key: ${CRYPTO_DEFAULT_SECRET_KEY}
+      signature:
+        api-key: ${CRYPTO_SIGNATURE_API_KEY}
+        secret-key: ${CRYPTO_SIGNATURE_SECRET_KEY}        
+      privacy:
+        password: ${CRYPTO_PRIVACY_PASSWORD}
+        salt: ${CRYPTO_PRIVACY_SALT}
+        iv: ${CRYPTO_PRIVACY_IV}
+
+    management:
+      server:
+        port: 9292
+      endpoints:
+        web:
+          exposure:
+            include: health,prometheus,metrics
+          base-path: /actuator
+      endpoint:
+        health:
+          show-details: when-authorized
+          probes:
+            enabled: true
+          prometheus:
+            enabled: true
+      metrics:
+        tags:
+          application: ${spring.application.name}
+          environment: prod
+          cluster: prod
+        distribution:
+          percentiles-histogram:
+            http:
+              server:
+                requests: true
+          minimum-expected-value: 
+            http.server.requests: 5ms
+          maximum-expected-value:
+            http.server.requests: 1000ms
+        enable:
+          all: true

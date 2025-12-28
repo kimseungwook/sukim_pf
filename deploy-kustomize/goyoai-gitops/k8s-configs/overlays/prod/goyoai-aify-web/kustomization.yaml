@@ -1,0 +1,37 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: goyoai-web
+resources:
+  - ../../../base/goyoai-aify-web
+  - configmap_promtail_sidecar.yaml
+patches:
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: goyoai-aify-web
+    path: cpu_config.yaml
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: goyoai-aify-web
+    path: replica_config.yaml
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: goyoai-aify-web
+    path: command_args.yaml
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: goyoai-aify-web
+    path: deployment_patches.yaml
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: goyoai-aify-web
+    path: promtail_sidecar.yaml

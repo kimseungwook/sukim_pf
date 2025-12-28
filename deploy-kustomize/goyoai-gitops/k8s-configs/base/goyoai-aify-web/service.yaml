@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: goyoai-aify-web
+  labels:
+    app.kubernetes.io/component: goyoai-aify-web-generator
+    app.kubernetes.io/instance: goyoai-aify-web-generator
+    app.kubernetes.io/part-of: goyoai-aify-web-generator
+spec:
+  type: ClusterIP
+  selector:
+    app: goyoai-aify-web-app
+  ports:
+  - port: 5000
+    targetPort: 3000

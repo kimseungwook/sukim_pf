@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: goyoai-gointern-backoffice
+spec:
+  template:
+    spec:
+      serviceAccountName: goyoai-vault-sa
+      containers:
+        - name: goyoai-gointern-backoffice-container
+          image: gphb.goyoai.com/goyoai-web/goyoai-gointern-backoffice:9ab0bc1-20251217085140

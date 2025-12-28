@@ -1,0 +1,254 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aify-system-application-config
+data:
+  application-prod.yml: |
+    logging.config: classpath:logback-spring-prod.xml
+
+    server:
+      port: 9293
+      servlet:
+        session:
+          cookie:
+            name: SESSION-AIFY-AUTH
+            same-site: None
+            secure: true
+            domain: goyoai.com
+
+    spring:
+      datasource:
+        url: ${POSTGRESQL_URL}
+        username: ${POSTGRESQL_USERNAME}
+        password: ${POSTGRESQL_PASSWORD}
+        hikari:
+          connectionTimeout: 30000
+          maximumPoolSize: 3        # 하루 100명 미만 사용 (최적화됨)
+          minimumIdle: 1            # 최소 1개 연결 유지
+          idleTimeout: 600000       # 유휴 연결 타임아웃 10분
+          maxLifetime: 1800000
+          poolName: HikariCP
+          readOnly: false
+          leak-detection-threshold: 60000
+          data-source-properties:
+            rewriteBatchedStatements: true
+      data:
+        redis:
+          host: ${REDIS_HOST}
+          port: ${REDIS_PORT}
+          # password: ${REDIS_PW}
+          lettuce:
+            pool:
+              max-active: 20
+              max-idle: 10
+              min-idle: 5
+              max-wait: 5s
+
+    cloud:
+      openFeign:
+        client:
+          config:
+            default:
+              loggerLevel: basic
+            ai-api:
+              connectTimeout: 600000
+              readTimeout: 600000
+              writeTimeout: 600000
+            # ai-meeting-api:
+            #   connectTimeout: 300000
+            #   readTimeout: 300000
+            #   writeTimeout: 300000
+
+    internal:
+      portal:
+        host: ${PORTAL_HOST}
+        api-key: ${PORTAL_API_KEY}
+        secret-key: ${PORTAL_SECRET_KEY}
+      ai:
+        host: ${AI_HOST}
+        api-key: ${AI_API_KEY}
+        query-stream:
+          emitter-timeout: 300000
+          web-client-timeout: 300
+
+    external:
+      viewer:
+        prefix: https://view.officeapps.live.com/op/embed.aspx?src=
+      oci:
+        user: ${OCI_USER}
+        finger-print: ${OCI_FINGER_PRINT}
+        tenancy: ${OCI_TENANCY}
+        storage:
+          name-space: ${OCI_NAME_SPACE}
+          general:
+            host: https://objectstorage.ap-seoul-1.oraclecloud.com
+            bucket-name: prod-gointern-general
+            name-space: ${OCI_NAME_SPACE}
+          common:
+            bucket-name: prod-aify-common
+            content-path: common/
+          public:
+            content-path: tenant/
+          private:
+            content-path: individual/
+          meeting:
+            content-path: minutes/
+      
+      msal:
+        oauth2:
+          host: https://login.microsoftonline.com/common/oauth2/v2.0
+          clientId: ${MSAL_CLIENT_ID}
+          clientSecret: ${MSAL_CLIENT_SECRET}
+          scope: email openid User.Read
+          redirectUri: ${MSAL_REDIRECT_URI}
+        api: https://graph.microsoft.com/v1.0
+        sharepoint:
+          domain: sharepoint.com
+          site_name: aify-service
+          root_path:
+        onedrive:
+          root_path: Go_Intern_Files
+          docs_path: Docs
+          meeting_path: Meeting
+      
+      google:
+        oauth2:
+          host: https://accounts.google.com/o/oauth2/v2/auth
+          hostToken: https://oauth2.googleapis.com
+          clientId: ${GOOGLE_CLIENT_ID}
+          clientSecret: ${GOOGLE_CLIENT_SECRET}
+          scope: openid email profile
+          redirectUri: ${GOOGLE_REDIRECT_URI}
+        api: https://www.googleapis.com
+        drive:
+          site_name: aify-service
+          root_path: Go_Intern_Files
+          docs_path: Docs
+          meeting_path: Meeting
+        sheets:
+          enabled: true
+          spreadsheet-id: ${GOOGLE_SHEETS_SPREADSHEET_ID}
+          credentials:
+            type: ${GOOGLE_SHEETS_TYPE}
+            project-id: ${GOOGLE_SHEETS_PROJECT_ID}
+            private-key-id: ${GOOGLE_SHEETS_PRIVATE_KEY_ID}
+            private-key: ${GOOGLE_SHEETS_PRIVATE_KEY}
+            client-email: ${GOOGLE_SHEETS_CLIENT_EMAIL}
+            client-id: ${GOOGLE_SHEETS_SHEETS_CLIENT_ID}
+            auth-uri: ${GOOGLE_SHEETS_AUTH_URI}
+            token-uri: ${GOOGLE_SHEETS_TOKEN_URI}
+            auth-provider-x509-cert-url: ${GOOGLE_SHEETS_AUTH_PROVIDER_CERT_URL}
+            client-x509-cert-url: ${GOOGLE_SHEETS_CLIENT_CERT_URL}
+            universe-domain: ${GOOGLE_SHEETS_UNIVERSE_DOMAIN}
+          sheet-names: aify-login,aify-main,aify-app,aify-common,aify-settings,ui-aify,backend,exception
+          sync-interval-minutes: 60
+      
+      apple:
+        oauth2:
+          host: https://appleid.apple.com/auth/authorize
+          clientId: ${APPLE_CLIENT_ID}
+          response_mode: form_post
+          response_type: code id_token
+          scope: name email
+          redirectUri: ${APPLE_REDIRECT_URI}
+          state: goyoai
+      
+      amplitude:
+        api-key: ${AMPLITUDE_API_KEY}
+        secret-key: ${AMPLITUDE_SECRET_KEY}
+      
+      hecto-financial:
+        host:
+          ui: https://tbnpg.settlebank.co.kr
+          uiNon: https://tbgw.settlebank.co.kr
+          nsPay: https://tb-nspay.settlebank.co.kr
+        payment:
+          subscription: # 구인증 카드 결제 (UI)
+            mchtId: ${HECTO_SUB_MCHT_ID}
+            method: ${HECTO_SUB_METHOD}
+            licenceKey: ${HECTO_SUB_LICENCE_KEY}
+            aes256Key: ${HECTO_SUB_AES256_KEY}
+          billKeyOnly: # 결제 없이 카드 Bill Key 만 발급
+            mchtId: ${HECTO_BILL_MCHT_ID}
+            licenceKey: ${HECTO_BILL_LICENCE_KEY}
+            aes256Key: ${HECTO_BILL_AES256_KEY}
+          simplicityA: # 카카오페이, 네이버페이, 페이코
+            mchtId: ${HECTO_SIMPLE_A_MCHT_ID}
+            method: ${HECTO_SIMPLE_A_METHOD}
+            notiUrl: ${HECTO_SIMPLE_A_NOTI_URL}
+            licenceKey: ${HECTO_SIMPLE_A_LICENCE_KEY}
+            aes256Key: ${HECTO_SIMPLE_A_AES256_KEY}
+          simplicityB: # 삼성페이, KB Pay, 하나 Pay
+            mchtId: ${HECTO_SIMPLE_B_MCHT_ID}
+            method: ${HECTO_SIMPLE_B_METHOD}
+            notiUrl: ${HECTO_SIMPLE_B_NOTI_URL}
+            licenceKey: ${HECTO_SIMPLE_B_LICENCE_KEY}
+            aes256Key: ${HECTO_SIMPLE_B_AES256_KEY}
+        mchtName: ${HECTO_MCHT_NAME}
+        mchtEName: ${HECTO_MCHT_ENAME}
+        notiUrl: ${HECTO_NOTI_URL}
+        nextUrl: ${HECTO_NEXT_URL}
+        cancUrl: ${HECTO_CANC_URL}
+      
+      slack:
+        webhook-url: ${SLACK_WEBHOOK_URL}
+        webhook-critical-url: ${SLACK_WEBHOOK_CRITICAL_URL}
+
+    cors:
+      origins: https://*.goyoai.com, https://appleid.apple.com
+
+    cryptography:
+      default:
+        secret-key: ${CRYPTO_DEFAULT_SECRET_KEY}
+      signature:
+        api-key: ${CRYPTO_SIGNATURE_API_KEY}
+        secret-key: ${CRYPTO_SIGNATURE_SECRET_KEY}
+      privacy:
+        password: ${CRYPTO_PRIVACY_PASSWORD}
+        salt: ${CRYPTO_PRIVACY_SALT}
+        iv: ${CRYPTO_PRIVACY_IV}    
+
+    kakao:
+      javascript-key: ${KAKAO_JAVASCRIPT_KEY}
+      channel-public-id: ${KAKAO_CHANNEL_PUBLIC_ID}
+
+    i18n:
+      default-locale: ko
+      supported-locales: ko,en
+      header-name: Accept-Language
+      cookie-name: locale
+
+    logging:
+      config: classpath:logback-spring-prod.xml
+      pattern:
+        level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+
+    management:
+      server:
+        port: 9292
+      endpoints:
+        web:
+          exposure:
+            include: health,prometheus,metrics,info,loggers
+          base-path: /actuator
+      tracing:
+        enabled: true
+        sampling:
+          probability: 1.0
+        propagation:
+          type: w3c
+      metrics:
+        tags:
+          application: ${spring.application.name}
+          environment: ${spring.profiles.active}
+        distribution:
+          percentiles-histogram:
+            http.server.requests: true
+        enable:
+          all: true
+
+    springdoc:
+      api-docs:
+        path: /v3/api-docs
+      swagger-ui:
+        path: /docs/index.html

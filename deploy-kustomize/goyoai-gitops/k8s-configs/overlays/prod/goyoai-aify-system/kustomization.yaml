@@ -1,0 +1,57 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: goyoai-web
+resources:
+  - ../../../base/goyoai-aify-system
+  - configmap_application.yaml
+  - configmap_logback.yaml
+  - configmap_promtail_sidecar.yaml
+  - configmap_vault_agent.yaml
+
+patches:
+  # - target:
+  #     kind: Deployment
+  #   path: trivy-skip-sidecars-patch.yaml
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: goyoai-aify-system
+    path: deployment_patches.yaml
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: goyoai-aify-system
+    path: vault_manual_sidecar.yaml
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: goyoai-aify-system
+    path: command_args.yaml
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: goyoai-aify-system
+    path: cpu_config.yaml
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: goyoai-aify-system
+    path: replica_config.yaml
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: goyoai-aify-system
+    path: promtail_sidecar.yaml
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: goyoai-aify-system
+    path: logback_patch.yaml
+  

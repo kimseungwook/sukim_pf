@@ -1,0 +1,50 @@
+# MinIO Console IngressRoute for Traefik
+# Domain: minio.8ai.store
+# Service: MinIO Console (Port 9090)
+
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: minio-console
+  namespace: minio
+  labels:
+    app: minio
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`minio.8ai.store`)
+      services:
+        - name: minio
+          port: 9090
+  tls:
+    certResolver: godaddy-resolver
+    domains:
+      - main: "*.8ai.store"
+
+---
+# MinIO API IngressRoute (Optional)
+# Domain: minio-api.8ai.store
+# Service: MinIO S3 API (Port 9000)
+
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: minio-api
+  namespace: minio
+  labels:
+    app: minio
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`minio-api.8ai.store`)
+      services:
+        - name: minio
+          port: 9000
+  tls:
+    certResolver: godaddy-resolver
+    domains:
+      - main: "*.8ai.store"

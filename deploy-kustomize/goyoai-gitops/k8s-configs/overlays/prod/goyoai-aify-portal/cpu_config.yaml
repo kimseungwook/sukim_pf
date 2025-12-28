@@ -1,0 +1,16 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: goyoai-aify-portal
+spec:
+  template:
+    spec:
+      containers:
+        - name: goyoai-aify-portal-container
+          resources:
+            requests:
+              cpu: "2000m"
+              memory: "5Gi"
+            limits:
+              cpu: "2000m"
+              memory: "5Gi"

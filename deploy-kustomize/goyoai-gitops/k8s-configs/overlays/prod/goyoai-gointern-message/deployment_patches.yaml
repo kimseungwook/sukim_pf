@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: goyoai-gointern-message
+spec:
+  template:
+    spec:
+      serviceAccountName: goyoai-vault-sa
+      containers:
+        - name: goyoai-gointern-message-container
+          image: gphb.goyoai.com/goyoai-web/goyoai-gointern-message:9ab0bc1-20251217085139

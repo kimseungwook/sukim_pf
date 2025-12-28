@@ -1,0 +1,205 @@
+## MinIO Helm Chart Values for sukim-pf
+## CloudPirates MinIO Chart: https://artifacthub.io/packages/helm/cloudpirates-minio/minio
+
+## Global parameters
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+## Common parameters
+nameOverride: ""
+fullnameOverride: "minio"
+commonLabels:
+  app.kubernetes.io/part-of: sukim-pf
+commonAnnotations: {}
+
+## MinIO Image
+image:
+  registry: docker.io
+  repository: minio/minio
+  tag: "RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e"
+  imagePullPolicy: IfNotPresent
+
+## Authentication
+auth:
+  rootUser: "admin"
+  rootPassword: ""  # Will be auto-generated if empty
+  existingSecret: "minio-secret"  # Use pre-created secret
+  existingSecretUserKey: "root-user"
+  existingSecretPasswordKey: "root-password"
+
+## MinIO Configuration
+config:
+  region: "ap-seoul-1"
+  browserEnabled: true
+  domain: ""
+  serverUrl: "https://minio-api.8ai.store"
+  minioOpts: ""
+  minioVolumes: ""
+  minioConfigEnvFile: ""
+  minioScannerSpeed: "default"
+  minioCompressionEnabled: "off"
+  minioCompressionAllowEncryption: "off"
+  minioCompressionExtensions: ""
+  minioCompressionMimeTypes: ""
+  
+  extraEnvVars: []
+
+## Default Buckets
+## Format: "bucket-name" or "bucket-name:policy"
+## Policy: none, download, upload, public
+defaultBuckets: "tekton-artifacts, harbor-storage, backup, ecommerce"
+
+## Deployment
+replicaCount: 1
+
+## Pod Configuration
+podAnnotations: {}
+podLabels:
+  app: minio
+
+## Security Context
+podSecurityContext:
+  fsGroup: 1001
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+## Service
+service:
+  type: ClusterIP
+  port: 9000
+  consolePort: 9090
+  annotations: {}
+  nodePorts:
+    api: ""
+    console: ""
+
+## Ingress for MinIO API
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: minio-api.sukim.site
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+## Ingress for MinIO Console
+consoleIngress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: minio-console.sukim.site
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+## Resources
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 250m
+    memory: 512Mi
+
+## Persistence
+persistence:
+  enabled: true
+  storageClass: "oci-bv"  # OCI Block Volume
+  annotations: {}
+  size: 50Gi
+  accessModes:
+    - ReadWriteOnce
+  existingClaim: ""
+  mountPath: /mnt/data
+
+## Service Account
+serviceAccount:
+  create: true
+  name: ""
+  automountServiceAccountToken: false
+  annotations: {}
+
+## Probes
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+  successThreshold: 1
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+  successThreshold: 1
+
+startupProbe:
+  enabled: true
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 30
+  successThreshold: 1
+
+## Node Selection
+nodeSelector: {}
+
+## Tolerations
+tolerations:
+  - key: "sukim-build"
+    operator: "Equal"
+    value: "true"
+    effect: "NoSchedule"
+
+## Affinity
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+            - key: node.kubernetes.io/instance-type
+              operator: In
+              values:
+                - VM.Standard.A1.Flex
+                - VM.Standard.E2.1.Micro
+
+## Post Job Configuration
+postJob:
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+
+## Bucket Initialization Job
+bucketInitJob:
+  ttlSecondsAfterFinished: 30
+  activeDeadlineSeconds: 300
+  completions: 1
+  parallelism: 1
+  backoffLimit: 3
+  restartPolicy: OnFailure
+  annotations: {}
+  podAnnotations: {}
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi

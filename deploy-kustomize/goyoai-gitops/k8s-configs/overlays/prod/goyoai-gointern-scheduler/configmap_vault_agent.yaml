@@ -1,0 +1,172 @@
+# goyoai-gitops/k8s-configs/overlays/prod/goyoai-gointern-scheduler/configmap_vault_agent.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gointern-scheduler-vault-config
+  namespace: goyoai-web
+data:
+  vault-agent.hcl: |
+    auto_auth {
+      method {
+        type = "kubernetes"
+        mount_path = "auth/kubernetes"
+        config = {
+          role = "goyoai"
+        }
+      }
+      
+      sink {
+        type = "file"
+        config = {
+          path = "/home/vault/.vault-token"
+        }
+      }
+    }
+
+    exit_after_auth = false
+
+    vault {
+      address = "http://goyo-vault.vault.svc:8200"
+    }
+
+    template {
+      destination = "/vault/secrets/app.env"
+      contents = <<EOT
+    {{- with secret "gointern-backend-system/data/postgresql" -}}
+    export POSTGRESQL_URL={{ .Data.data.gointern_url | printf "%q" }}
+    export POSTGRESQL_USERNAME={{ .Data.data.username | printf "%q" }}
+    export POSTGRESQL_PASSWORD={{ index .Data.data "password" | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/redis" -}}
+    export REDIS_HOST={{ .Data.data.gointern_backend_host | printf "%q" }}
+    export REDIS_PORT={{ .Data.data.port | printf "%q" }}
+    export REDIS_PW={{ .Data.data.gointern_backend_pw | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/internal/portal" -}}
+    export PORTAL_HOST={{ index .Data.data "host" | printf "%q" }}
+    export PORTAL_API_KEY={{ index .Data.data "api-key" | printf "%q" }}
+    export PORTAL_SECRET_KEY={{ index .Data.data "secret-key" | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/internal/ai" -}}
+    export AI_HOST={{ .Data.data.host | printf "%q" }}
+    export AI_API_KEY={{ index .Data.data "api-key" | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/external/oci" -}}
+    export OCI_USER={{ .Data.data.user | printf "%q" }}
+    export OCI_FINGER_PRINT={{ index .Data.data "finger-print" | printf "%q" }}
+    export OCI_TENANCY={{ .Data.data.tenancy | printf "%q" }}
+    export OCI_NAME_SPACE={{ index .Data.data "name-space" | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/external/msal" -}}
+    export MSAL_CLIENT_ID={{ .Data.data.clientId | printf "%q" }}
+    export MSAL_CLIENT_SECRET={{ .Data.data.clientSecret | printf "%q" }}
+    export MSAL_REDIRECT_URI={{ index .Data.data "redirectUri" | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/external/google" -}}
+    export GOOGLE_CLIENT_ID={{ .Data.data.clientId | printf "%q" }}
+    export GOOGLE_CLIENT_SECRET={{ .Data.data.clientSecret | printf "%q" }}
+    export GOOGLE_REDIRECT_URI={{ index .Data.data "redirectUri" | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/external/amplitude" -}}
+    export AMPLITUDE_API_KEY={{ index .Data.data "api-key" | printf "%q" }}
+    export AMPLITUDE_SECRET_KEY={{ index .Data.data "secret-key" | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/external/apple" -}}
+    export APPLE_CLIENT_ID={{ index .Data.data "clientId" | printf "%q" }}
+    export APPLE_REDIRECT_URI={{ index .Data.data "redirectUri" | printf "%q" }}
+    export APPLE_STATE={{ index .Data.data "state" | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/external/slack" -}}
+    export SLACK_WEBHOOK_URL={{ index .Data.data "webhook-url" | printf "%q" }}
+    export SLACK_WEBHOOK_CRITICAL_URL={{ index .Data.data "webhook-critical-url" | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/cryptography/default" -}}
+    export CRYPTO_DEFAULT_SECRET_KEY={{ index .Data.data "secret-key" | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/cryptography/signature" -}}
+    export CRYPTO_SIGNATURE_API_KEY={{ index .Data.data "api-key" | printf "%q" }}
+    export CRYPTO_SIGNATURE_SECRET_KEY={{ index .Data.data "secret-key" | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/cryptography/privacy" -}}
+    export CRYPTO_PRIVACY_PASSWORD={{ .Data.data.password | printf "%q" }}
+    export CRYPTO_PRIVACY_SALT={{ .Data.data.salt | printf "%q" }}
+    export CRYPTO_PRIVACY_IV={{ .Data.data.iv | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/oauth/atlassian" -}}
+    export ATLASSIAN_CLIENT_ID={{ .Data.data.client_id | printf "%q" }}
+    export ATLASSIAN_CLIENT_SECRET={{ .Data.data.client_secret | printf "%q" }}
+    export ATLASSIAN_REDIRECT_URI={{ .Data.data.redirect_uri | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/oauth/monday" -}}
+    export MONDAY_CLIENT_ID={{ .Data.data.client_id | printf "%q" }}
+    export MONDAY_CLIENT_SECRET={{ .Data.data.client_secret | printf "%q" }}
+    export MONDAY_REDIRECT_URI={{ .Data.data.redirect_uri | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/oauth/azure" -}}
+    export AZURE_OBJECT_ID={{ .Data.data.object_id | printf "%q" }}
+    export AZURE_CLIENT_ID={{ .Data.data.client_id | printf "%q" }}
+    export AZURE_CLIENT_SECRET={{ .Data.data.client_secret | printf "%q" }}
+    export AZURE_TENANT_ID={{ .Data.data.tenant_id | printf "%q" }}
+    export AZURE_REDIRECT_URI={{ .Data.data.redirect_uri | printf "%q" }}
+    export AZURE_NOTIFICATION_URI={{ .Data.data.notification_uri | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/oauth/gcp" -}}
+    export GOOGLE_API_KEY={{ .Data.data.api_key | printf "%q" }}
+    export GOOGLE_CLIENT_ID={{ .Data.data.client_id | printf "%q" }}
+    export GOOGLE_CLIENT_SECRET={{ .Data.data.client_secret | printf "%q" }}
+    export GOOGLE_REDIRECT_URI={{ .Data.data.redirect_uri | printf "%q" }}
+    export GOOGLE_SUBSCRIPTION_WEBHOOK_URI={{ .Data.data.subscription_webhook_uri | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/oauth/figma" -}}
+    export FIGMA_CLIENT_ID={{ .Data.data.client_id | printf "%q" }}
+    export FIGMA_CLIENT_SECRET={{ .Data.data.client_secret | printf "%q" }}
+    export FIGMA_REDIRECT_URI={{ .Data.data.redirect_uri | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/oauth/slack" -}}
+    export SLACK_APP_ID={{ .Data.data.app_id | printf "%q" }}
+    export SLACK_CLIENT_ID={{ .Data.data.client_id | printf "%q" }}
+    export SLACK_CLIENT_SECRET={{ .Data.data.client_secret | printf "%q" }}
+    export SLACK_REDIRECT_URI={{ .Data.data.redirect_uri | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/oauth/notion" -}}
+    export NOTION_CLIENT_ID={{ .Data.data.client_id | printf "%q" }}
+    export NOTION_CLIENT_SECRET={{ .Data.data.client_secret | printf "%q" }}
+    export NOTION_REDIRECT_URI={{ .Data.data.redirect_uri | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/oauth/zoom" -}}
+    export ZOOM_CLIENT_ID={{ .Data.data.client_id | printf "%q" }}
+    export ZOOM_CLIENT_SECRET={{ .Data.data.client_secret | printf "%q" }}
+    export ZOOM_REDIRECT_URI={{ .Data.data.redirect_uri | printf "%q" }}
+    {{ end -}}
+
+    {{- with secret "gointern-backend-system/data/oauth/dropbox" -}}
+    export DROPBOX_CLIENT_ID={{ .Data.data.client_id | printf "%q" }}
+    export DROPBOX_CLIENT_SECRET={{ .Data.data.client_secret | printf "%q" }}
+    export DROPBOX_REDIRECT_URI={{ .Data.data.redirect_uri | printf "%q" }}
+    {{ end -}}
+    EOT
+    }
+
+    template_config {
+      exit_on_retry_failure = true
+    }

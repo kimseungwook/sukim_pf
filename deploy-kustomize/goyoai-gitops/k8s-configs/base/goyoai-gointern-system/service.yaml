@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: goyoai-gointern-system
+  labels:
+    app.kubernetes.io/component: goyoai-gointern-system-generator
+    app.kubernetes.io/instance: goyoai-gointern-system-generator
+    app.kubernetes.io/part-of: goyoai-gointern-system-generator
+spec:
+  type: ClusterIP
+  selector:
+    app: goyoai-gointern-system-app
+  ports:
+  - port: 5000
+    targetPort: 9195
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: goyoai-gointern-system-app
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/actuator/prometheus"
+    prometheus.io/port: "9292"
+  labels:
+    app: goyoai-gointern-system-app
+    app.kubernetes.io/component: goyoai-gointern-system-generator
+    app.kubernetes.io/instance: goyoai-gointern-system-generator
+    app.kubernetes.io/part-of: goyoai-gointern-system-generator
+spec:
+  type: ClusterIP
+  selector:
+    app: goyoai-gointern-system-app
+  ports:
+  - name: metrics 
+    port: 9292
+    targetPort: 9292
+    protocol: TCP

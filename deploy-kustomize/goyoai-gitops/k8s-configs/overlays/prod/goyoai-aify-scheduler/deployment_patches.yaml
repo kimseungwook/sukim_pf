@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: goyoai-aify-scheduler
+spec:
+  template:
+    spec:
+      serviceAccountName: goyoai-vault-sa
+      containers:
+        - name: goyoai-aify-scheduler-container
+          image: gphb.goyoai.com/goyoai-web/goyoai-aify-scheduler:82b14e7-20251217070607

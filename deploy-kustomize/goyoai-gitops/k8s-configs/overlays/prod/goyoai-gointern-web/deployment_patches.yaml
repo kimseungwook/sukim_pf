@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: goyoai-gointern-web
+spec:
+  template:
+    spec:
+      serviceAccountName: goyoai-vault-sa
+      containers:
+        - name: goyoai-gointern-web-container
+          image: gphb.goyoai.com/goyoai-web/goyoai-gointern-web:d6d1c56-20251224090159
