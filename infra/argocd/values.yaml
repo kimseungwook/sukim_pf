@@ -1,14 +1,14 @@
 global:
-  domain: gdargo.go-intern.io
+  domain: argocd.8ai.store
   
   nodeSelector:
-    service: tools  # 최신 표준에 맞춤 (goyo-svc -> service)
+    service: tools  # 최신 표준에 맞춤 
     # kubernetes.io/os: linux 는 기본값이므로 생략
 
 configs:
   cm:
     # ArgoCD URL 설정
-    url: https://gdargo.go-intern.io
+    url: https://argocd.8ai.store
     
     # Dex OIDC Authentik 연동 설정
     dex.config: |
@@ -17,8 +17,8 @@ configs:
         id: authentik
         name: authentik
         config:
-          issuer: http://gdauth.go-intern.io/application/o/argocd/
-          clientID: hhNIGo2Ji2HXQxVNKst35aE3hN7LNXLx2cGZJLx6
+          issuer: https://authentik.8ai.store/application/o/argocd/
+          clientID: 7fxHrUG7xPiWkdFnKH0pxRj6MBTJjPOPt5kPewEu
           clientSecret: $dex.authentik.clientSecret
           insecureEnableGroups: true
           insecureSkipVerify: true
@@ -64,10 +64,10 @@ server:
   
   # Authentik URL 해석용 hosts alias
   hostAliases:
-    - ip: "10.96.151.83"
+    - ip: "10.96.57.150"
       hostnames:
-        - "gdauth.go-intern.io"
-        - "gdargo.go-intern.io"
+        - "authentik.8ai.store"
+        - "argocd.8ai.store"
   
   # Prometheus metrics 활성화
   metrics:
@@ -113,10 +113,10 @@ dex:
   
   # Authentik OIDC Issuer 해석용 hosts alias
   hostAliases:
-    - ip: "10.96.151.83"
+    - ip: "10.96.57.150"
       hostnames:
-        - "gdauth.go-intern.io"
-        - "gdargo.go-intern.io"
+        - "authentik.8ai.store"
+        - "argocd.8ai.store"
   
   # Dex metrics 활성화
   metrics:

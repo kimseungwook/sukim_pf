@@ -72,8 +72,7 @@
     ]
   },
   "description": "[Version] Updated on 2024.05.22. Optimized the display of important metrics. Rebuilt using the new Grafana 10 style, added the concept of health scores, and included some charts of overall resource consumption information. Includes overall resource display and detailed resource charts: CPU, Memory, Disk, IO, Network, and other monitoring metrics. https://github.com/starsliao/TenSunS",
-"editable": true,
-
+  "editable": true,
   "fiscalYearStartMonth": 0,
   "gnetId": 16098,
   "graphTooltip": 0,
@@ -917,7 +916,7 @@
           "refId": "P"
         }
       ],
-      "title": "Server Resource Overview Table【主机Total Hosts：$total】",
+      "title": "Server Resource Overview Table【Total Hosts：$total】",
       "transformations": [
         {
           "id": "merge",
@@ -5685,7 +5684,7 @@
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
-        "regex": "",
+        "regex": "sukim-pf",
         "skipUrlSync": false,
         "sort": 5,
         "type": "query"
@@ -5936,7 +5935,7 @@
     ]
   },
   "timezone": "browser",
-  "title": "Node Exporter Dashboard 20240520",
+  "title": "Node Exporter",
   "uid": "StarsL-JOB-node",
   "version": 5,
   "weekStart": ""

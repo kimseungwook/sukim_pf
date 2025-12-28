@@ -30,3 +30,5 @@ terraform.rc
 **/pg-secrets.yaml
 **/nocodb-env-secret.yaml
 **/report_secret.yaml
+**/dex_secret.yaml
+**/authentik_secret.yaml

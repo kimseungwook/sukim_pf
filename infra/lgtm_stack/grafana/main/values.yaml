@@ -48,21 +48,30 @@ grafana.ini:
   analytics:
     check_for_updates: true
   auth:
-    signout_redirect_url: "https://gpauth.goyoai.io/application/o/grafana/end-session/"
+    signout_redirect_url: "https://authentik.8ai.store/application/o/grafana/end-session/"
     oauth_auto_login: true
   auth.generic_oauth:
     name: authentik
     enabled: true
-    client_id: "E61uEoFnfQBoVFd0cHvX2F2m72GEP6qwh5WtYoDL"
-    # client_secret: "cdNCe2IcE2oYdkhed6M6amAAJhR34CKpZ3dd2UJZD9ROtSG62qnaXjJmjce5MzMfYNyZKLc8uQOwZFxPprXUnN022UyFcHYYBHlQBp3adx7Kx3KbqAy6I8eOyLHAN0JJ"
+    client_id: "v0oUWZhTDM6rg5x2SPW4eFWPY6EOcxHqk1uxw46S"
+    client_secret: $__env{GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET}  # Secret에서 환경 변수로 주입
     scopes: "openid profile email"
-    auth_url: "https://gpauth.goyoai.io/application/o/authorize/"
-    token_url: "https://gpauth.goyoai.io/application/o/token/"
-    api_url: "https://gpauth.goyoai.io/application/o/userinfo/"
+    auth_url: "https://authentik.8ai.store/application/o/authorize/"
+    token_url: "https://authentik.8ai.store/application/o/token/"
+    api_url: "https://authentik.8ai.store/application/o/userinfo/"
     role_attribute_path: contains(groups, 'Grafana Admins') && 'Admin' || contains(groups, 'Grafana Editors') && 'Editor' || 'Viewer'
   server:
-    domain: "gpgr.goyoai.io"
-    root_url: "https://gpgr.goyoai.io/"
+    domain: "grafana.8ai.store"
+    root_url: "https://grafana.8ai.store/"
+
+# Secret에서 환경 변수로 주입
+envValueFrom:
+  GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:
+    secretKeyRef:
+      name: grafana-authentik-secret
+      key: client-secret
+
+
 nodeSelector:
   service: "monitoring"
 

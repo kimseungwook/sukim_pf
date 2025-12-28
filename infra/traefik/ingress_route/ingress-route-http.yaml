@@ -64,17 +64,7 @@ spec:
         - kind: Service
           name: grafana
           namespace: monitoring
-          port: 3000
-
-    - kind: Rule
-      match: Host(`grafana.8ai.store`)
-      middlewares:
-        - name: redirect-http-https
-      services:
-        - kind: Service
-          name: grafana
-          namespace: monitoring
-          port: 3000
+          port: 80
 
     - kind: Rule
       match: Host(`nocodb.8ai.store`)

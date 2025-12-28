@@ -6712,7 +6712,7 @@
           "refId": "StandardVariableQuery"
         },
         "refresh": 2,
-        "regex": "",
+        "regex": "sukim-pf",
         "skipUrlSync": false,
         "sort": 5,
         "tagValuesQuery": "",

@@ -10,10 +10,20 @@ spec:
     - kind: Rule
       match: Host(`tekton.8ai.store`)
       priority: 10
+      middlewares:
+        - name: forwardauth
+          namespace: traefik
       services:
         - name: tekton-dashboard
           namespace: tekton-pipelines
           port: 9097
+    - kind: Rule
+      match: Host(`tekton.8ai.store`) && PathPrefix(`/outpost.goauthentik.io/`)
+      priority: 20
+      services:
+        - name: authentik-server
+          namespace: authentik
+          port: 80
 
     - kind: Rule
       match: Host(`argocd.8ai.store`)
@@ -97,10 +107,20 @@ spec:
     - kind: Rule
       match: Host(`kyverno.8ai.store`)
       priority: 10
+      middlewares:
+        - name: forwardauth
+          namespace: traefik
       services:
         - name: policy-reporter-ui
           namespace: kyverno
           port: 8080
+    - kind: Rule
+      match: Host(`kyverno.8ai.store`) && PathPrefix(`/outpost.goauthentik.io/`)
+      priority: 20
+      services:
+        - name: authentik-server
+          namespace: authentik
+          port: 80
 
     - kind: Rule
       match: Host(`grafana.8ai.store`)
@@ -108,31 +128,61 @@ spec:
       services:
         - name: grafana
           namespace: monitoring
-          port: 3000
+          port: 80
 
     - kind: Rule
       match: Host(`nocodb.8ai.store`)
       priority: 10
+      middlewares:
+        - name: forwardauth
+          namespace: traefik
       services:
         - name: nocodb
           namespace: nocodb
           port: 8080
+    - kind: Rule
+      match: Host(`nocodb.8ai.store`) && PathPrefix(`/outpost.goauthentik.io/`)
+      priority: 20
+      services:
+        - name: authentik-server
+          namespace: authentik
+          port: 80
 
     - kind: Rule
       match: Host(`trivy.8ai.store`)
       priority: 10
+      middlewares:
+        - name: forwardauth
+          namespace: traefik
       services:
         - name: trivy-operator-dashboard
           namespace: trivy
           port: 8900
+    - kind: Rule
+      match: Host(`trivy.8ai.store`) && PathPrefix(`/outpost.goauthentik.io/`)
+      priority: 20
+      services:
+        - name: authentik-server
+          namespace: authentik
+          port: 80
 
     - kind: Rule
       match: Host(`kuma.8ai.store`)
       priority: 10
+      middlewares:
+        - name: forwardauth
+          namespace: traefik
       services:
         - name: uptime-kuma
           namespace: uptime-kuma
           port: 3001
+    - kind: Rule
+      match: Host(`kuma.8ai.store`) && PathPrefix(`/outpost.goauthentik.io/`)
+      priority: 20
+      services:
+        - name: authentik-server
+          namespace: authentik
+          port: 80
 
     - kind: Rule
       match: Host(`vault.8ai.store`)

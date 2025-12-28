@@ -64,8 +64,13 @@ spec:
       min_wal_size: "512MB"               # 최소화
       max_wal_size: "1GB"                 # 최소화
   
-  # Monitoring은 Operator values.yaml에서 설정 (podMonitorEnabled: true)
-  # Cluster 레벨에서는 자동으로 활성화됨
+  # Monitoring - PostgreSQL Cluster 메트릭 수집 활성화
+  monitoring:
+    enablePodMonitor: true
+    # ConfigMap을 참조하여 커스텀 쿼리 사용 (cnpg-default-monitoring)
+    customQueriesConfigMap:
+      - name: cnpg-default-monitoring
+        key: queries
   
   # Backup (선택사항 - Portfolio에서는 비활성화)
   # backup:

@@ -31,6 +31,7 @@ prometheusOperator:
             operator: NotIn
             values:
             - build
+
   admissionWebhooks:
     patch:
       nodeSelector:
@@ -40,10 +41,10 @@ prometheusOperator:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
             - matchExpressions:
-              - key: service
+              - key: cpu-type
                 operator: In
                 values:
-                - monitoring
+                - arm64
               - key: workload-type
                 operator: NotIn
                 values:
@@ -51,58 +52,52 @@ prometheusOperator:
 
 prometheus:
   enabled: true
+
   prometheusSpec:
     image:
       registry: quay.io
       repository: prometheus/prometheus
       tag: v3.0.1
-    
-    # [핵심] Grafana 대시보드가 데이터를 찾을 수 있게 라벨 추가
-    externalLabels:
-      origin_prometheus: "sukim-pf"
+      sha: ""
 
-    # [핵심] Mimir로 메트릭 전송 (에러 방지 설정 포함)
+    # Mimir로 메트릭 전송
     remoteWrite:
       - url: "http://mimir-gateway.monitoring.svc.cluster.local:80/api/v1/push"
         headers:
           X-Scope-OrgID: "1"
-        # [중요] Mimir가 거부하는 '점(.) 포함 메트릭' 필터링 (400 에러 해결)
-        writeRelabelConfigs:
-          - sourceLabels: [__name__]
-            regex: ".*\\..*"
-            action: drop
-          # 2. http.method 라벨 삭제 (라벨 이름 변경이 복잡하면 그냥 지우는 게 안전)
-          - regex: "http\\.method"
-            action: labeldrop
-            
-          # 3. http.url 라벨 삭제
-          - regex: "http\\.url"
-            action: labeldrop
-          
+    
+    # Remote Write Receiver 활성화
     enableRemoteWriteReceiver: true
-    logLevel: debug
+    
+    logLevel: info  # debug에서 info로 변경 (운영환경 권장)
+    
+    # 메트릭 보존 기간
     retention: 10d
+    
+    # 스크랩 간격
     scrapeInterval: 30s
-    scrapeTimeout: 30s
     evaluationInterval: 30s
     
+    # 리소스 제한
     resources:
       requests:
-        memory: 1Gi
-        cpu: 500m
+        memory: 400Mi
+        cpu: 200m
       limits:
-        memory: 2Gi
-        cpu: 1000m
+        memory: 800Mi
+        cpu: 400m
 
+    # 스토리지 설정
     storageSpec:
       volumeClaimTemplate:
         spec:
-          storageClassName: oci-bv
+          storageClassName: standard
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
               storage: 50Gi
 
+    # Pod 스케줄링
     nodeSelector:
       cpu-type: arm64
     affinity:
@@ -110,15 +105,16 @@ prometheus:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: service
+            - key: cpu-type
               operator: In
               values:
-              - monitoring
+              - arm64
             - key: workload-type
               operator: NotIn
               values:
               - build
 
+    # 보안 컨텍스트
     securityContext:
       runAsGroup: 2000
       runAsNonRoot: true
@@ -127,30 +123,39 @@ prometheus:
       seccompProfile:
         type: RuntimeDefault
 
+    # Pod 반-어피니티 비활성화 (단일 replica 사용)
     podAntiAffinity: ""
 
+  # 서비스 계정
   serviceAccount:
     create: true
     name: ""
     automountServiceAccountToken: true
 
+  # 서비스 설정
   service:
     type: ClusterIP
     port: 9090
     targetPort: 9090
 
+  # ServiceMonitor
   serviceMonitor:
     selfMonitor: true
     interval: ""
     additionalLabels: {}
 
+  # Ingress 비활성화
   ingress:
     enabled: false
 
+# Alertmanager 설정
 alertmanager:
   enabled: true
+  
   alertmanagerSpec:
     externalUrl: http://grafana.monitoring.svc.cluster.local:80
+    
+    # 리소스 제한
     resources:
       requests:
         memory: 200Mi
@@ -158,6 +163,8 @@ alertmanager:
       limits:
         memory: 400Mi
         cpu: 200m
+
+    # Pod 스케줄링
     nodeSelector:
       cpu-type: arm64
     affinity:
@@ -165,15 +172,16 @@ alertmanager:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
           - matchExpressions:
-            - key: service
+            - key: cpu-type
               operator: In
               values:
-              - monitoring
+              - arm64
             - key: workload-type
               operator: NotIn
               values:
               - build
 
+    # 보안 컨텍스트
     securityContext:
       runAsGroup: 2000
       runAsNonRoot: true
@@ -181,6 +189,8 @@ alertmanager:
       fsGroup: 2000
       seccompProfile:
         type: RuntimeDefault
+
+    # Pod 반-어피니티 비활성화
     podAntiAffinity: ""
 
   serviceAccount:
@@ -193,27 +203,70 @@ alertmanager:
     port: 9093
     targetPort: 9093
 
+# Grafana 비활성화 (별도 설치)
 grafana:
   enabled: false
 
+# Node Exporter 설정 - Virtual Node만 제외
 nodeExporter:
   enabled: true
 
 prometheus-node-exporter:
+  # Virtual Node만 제외하는 설정
+  # DaemonSet이므로 기본적으로 모든 노드에 배포됨
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
+        # Virtual Node가 아닌 모든 노드 선택 (cpu-type=virtual인 노드 제외)
         - matchExpressions:
           - key: cpu-type
             operator: NotIn
             values:
-            - virtual
-          - key: workload-type
-            operator: NotIn
-            values:
-            - build
-    
+            - arm64
+
+  # 모든 노드의 taint를 tolerate
+  # Virtual Node의 taint(workload=virtual:NoSchedule)는 tolerate하지 않음
+  tolerations:
+    # cpu-type=monitoring 노드의 taint만 tolerate
+    - key: "cpu-type"
+      operator: "Equal"
+      value: "monitoring"
+      effect: "NoSchedule"
+    - key: "cpu-type"
+      operator: "Equal"
+      value: "deploy"
+      effect: "NoSchedule"
+    - key: "cpu-type"
+      operator: "Equal"
+      value: "redis"
+      effect: "NoSchedule"
+    - key: "cpu-type"
+      operator: "Equal"
+      value: "amd64"
+      effect: "NoSchedule"
+    # 기타 일반적인 taint들 tolerate
+    - key: "node.kubernetes.io/not-ready"
+      operator: "Exists"
+      effect: "NoExecute"
+    - key: "node.kubernetes.io/unreachable"
+      operator: "Exists"
+      effect: "NoExecute"
+    - key: "node.kubernetes.io/disk-pressure"
+      operator: "Exists"
+      effect: "NoSchedule"
+    - key: "node.kubernetes.io/memory-pressure"
+      operator: "Exists"
+      effect: "NoSchedule"
+    - key: "node.kubernetes.io/pid-pressure"
+      operator: "Exists"
+      effect: "NoSchedule"
+    - key: "node.kubernetes.io/unschedulable"
+      operator: "Exists"
+      effect: "NoSchedule"
+    # workload=virtual taint는 tolerate하지 않음 (Virtual Node 제외)
+
+  # 추가 설정
   extraArgs:
     - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/.+)($|/)
     - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|erofs)$
@@ -231,6 +284,7 @@ prometheus-node-exporter:
       relabelings: []
       metricRelabelings: []
 
+  # 리소스 제한
   resources:
     requests:
       memory: 50Mi
@@ -239,9 +293,11 @@ prometheus-node-exporter:
       memory: 100Mi
       cpu: 200m
 
+# Kube State Metrics 설정
 kube-state-metrics:
   nodeSelector:
     cpu-type: arm64
+    
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
@@ -255,9 +311,13 @@ kube-state-metrics:
             operator: NotIn
             values:
             - build
+            
+  # 커스텀 레이블 추가 (cpu-type, service 레이블 포함)
   extraArgs:
     - --metric-labels-allowlist=nodes=[cpu-type,kubernetes.io/hostname,service,node-type]
+
   releaseLabel: true
+
   prometheus:
     monitor:
       enabled: true
@@ -266,27 +326,38 @@ kube-state-metrics:
       metrics:
         honorLabels: true
 
+# Kubelet 모니터링 설정 - Virtual Node 고려
 kubelet:
   enabled: true
   namespace: kube-system
+
   serviceMonitor:
     enabled: true
+    
+    # Virtual Node는 kubelet 메트릭이 다를 수 있으므로
+    # cpu-type=virtual 노드 제외
     relabelings:
       - action: replace
         sourceLabels: [__metrics_path__]
         targetLabel: metrics_path
+      # Virtual Node 제외 (cpu-type=virtual)
       - sourceLabels: [__meta_kubernetes_node_label_goyo_svc]
         regex: virtual
         action: drop
+      # Virtual Node 제외 (service=virtual)
       - sourceLabels: [__meta_kubernetes_node_label_service]
         regex: virtual
         action: drop
+
+    # cAdvisor 설정
     cAdvisor: true
-    cAdvisorInterval: 30s
+    cAdvisorInterval: 10s
     cAdvisorRelabelings:
       - action: replace
         sourceLabels: [__metrics_path__]
         targetLabel: metrics_path
+    
+    # 불필요한 메트릭 제거
     cAdvisorMetricRelabelings:
       - sourceLabels: [__name__]
         action: drop
@@ -312,12 +383,18 @@ kubelet:
       - sourceLabels: [id, pod]
         action: drop
         regex: '.+;'
+
+    # probes 활성화
     probes: true
     probesRelabelings:
       - action: replace
         sourceLabels: [__metrics_path__]
         targetLabel: metrics_path
+
+    # resource 메트릭 비활성화 (cAdvisor와 중복)
     resource: false
+
+    # 기타 설정
     https: true
     insecureSkipVerify: true
     interval: ""
@@ -325,39 +402,55 @@ kubelet:
     honorTimestamps: true
     trackTimestampsStaleness: true
 
+# Kubernetes 컴포넌트 모니터링
 kubernetesServiceMonitors:
   enabled: true
+
+# API Server 모니터링
 kubeApiServer:
   enabled: true
   tlsConfig:
     serverName: kubernetes
     insecureSkipVerify: false
+
+# Controller Manager 모니터링
 kubeControllerManager:
   enabled: true
   service:
     enabled: true
     port: null
     targetPort: null
+
+# Scheduler 모니터링
 kubeScheduler:
   enabled: true
   service:
     enabled: true
     port: null
     targetPort: null
+
+# Proxy 모니터링
 kubeProxy:
   enabled: true
+
+# CoreDNS 모니터링
 coreDns:
   enabled: true
+
+# etcd 모니터링 (OKE는 관리형이므로 비활성화)
 kubeEtcd:
   enabled: false
+
+# Windows 모니터링 비활성화
 windowsMonitoring:
   enabled: false
 
+# Default Rules
 defaultRules:
   create: true
   rules:
     alertmanager: true
-    etcd: false
+    etcd: false  # OKE는 관리형 etcd
     configReloaders: true
     general: true
     k8sContainerCpuUsageSecondsTotal: true
@@ -391,5 +484,6 @@ defaultRules:
     prometheusOperator: true
     windows: false
 
+# Thanos Ruler 비활성화
 thanosRuler:
   enabled: false
