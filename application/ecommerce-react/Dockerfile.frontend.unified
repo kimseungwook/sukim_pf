@@ -1,0 +1,310 @@
+# Dockerfile.frontend.unified 
+# Unified Dockerfile for goyoai-frontend monorepo - Development Environment
+# Optimized for Virtual Node (Harbor Layer Cache) - Speed Priority
+#
+# Usage: docker build --build-arg APP=goyoai-gointern-web \
+#                      --target=runtime-standalone \
+#                      -f Dockerfile.frontend.unified . 
+
+ARG NODE_VERSION=20.18.3
+ARG ALPINE_VERSION=3.21
+ARG BASE_IMAGE=gdhb.goyoai.com/common/node:${NODE_VERSION}-alpine${ALPINE_VERSION}
+
+# ============================================================================
+# Dependencies Stage - 의존성 다운로드 (Layer Cache 활용)
+# ============================================================================
+FROM ${BASE_IMAGE} AS dependencies
+
+ARG APP
+ARG PNPM_VERSION=9.12.0
+
+WORKDIR /app
+
+# ⭐ Step 1: pnpm 설치 (거의 변하지 않음)
+RUN npm install -g pnpm@${PNPM_VERSION}
+
+# ⭐ Step 2: Workspace 설정 파일만 먼저 복사 (거의 변하지 않음)
+COPY pnpm-workspace.yaml ./
+COPY .npmrc ./ 
+
+# ⭐ Step 3: Root package.json과 lockfile만 복사 (의존성 정의)
+COPY package.json pnpm-lock.yaml ./
+
+# ⭐ Step 4: package.json 파일들만 복사 (간소화)
+# apps와 packages의 package.json만 복사하여 의존성 설치
+COPY apps/*/package.json /tmp/apps-pkg/
+COPY packages/*/package.json /tmp/packages-pkg/
+
+# apps 구조 생성
+RUN mkdir -p apps && \
+    cd /tmp/apps-pkg && \
+    for file in *; do \
+        if [ -f "$file" ]; then \
+            appname=$(echo "$file" | sed 's/package.json//'); \
+            if [ -n "$appname" ]; then \
+                mkdir -p /app/apps/$appname && \
+                cp "$file" /app/apps/$appname/package.json; \
+            fi; \
+        fi; \
+    done
+
+# packages 구조 생성
+RUN mkdir -p packages && \
+    cd /tmp/packages-pkg && \
+    for file in *; do \
+        if [ -f "$file" ]; then \
+            pkgname=$(echo "$file" | sed 's/package.json//'); \
+            if [ -n "$pkgname" ]; then \
+                mkdir -p /app/packages/$pkgname && \
+                cp "$file" /app/packages/$pkgname/package.json; \
+            fi; \
+        fi; \
+    done && \
+    rm -rf /tmp/apps-pkg /tmp/packages-pkg
+
+# ⭐⭐⭐ Step 4.5: packages 디렉토리 전체 복사 (workspace 패키지 해결용)
+# 이 단계가 추가되어야 @repo/* 패키지들이 제대로 인식됩니다
+COPY packages/ ./packages/
+
+# ⭐⭐⭐ Step 5: 의존성 설치 (production=false, shamefully-hoist 적용)
+RUN echo "=========================================" && \
+    echo "📦 Installing Dependencies" && \
+    echo "=========================================" && \
+    echo "Target APP: ${APP}" && \
+    echo "PNPM Version: ${PNPM_VERSION}" && \
+    echo "Install Mode: Development (includes devDependencies)" && \
+    echo "Hoisting: Enabled (--shamefully-hoist)" && \
+    echo "=========================================" && \
+    echo "" && \
+    pnpm install --no-frozen-lockfile --shamefully-hoist && \
+    echo "" && \
+    echo "=========================================" && \
+    echo "✅ Dependencies installed successfully" && \
+    echo "=========================================" && \
+    echo "" && \
+    echo "--- Verification ---" && \
+    echo "Checking critical build tools:" && \
+    ls -la /app/node_modules/.bin/env-cmd 2>/dev/null && echo "  ✓ env-cmd found" || echo "  ✗ env-cmd MISSING" && \
+    ls -la /app/node_modules/.bin/next 2>/dev/null && echo "  ✓ next found" || echo "  ✗ next MISSING" && \
+    ls -la /app/node_modules/.bin/tailwindcss 2>/dev/null && echo "  ✓ tailwindcss found" || echo "  ✗ tailwindcss MISSING" && \
+    echo "" && \
+    echo "Workspace packages:" && \
+    ls -d /app/packages/*/ 2>/dev/null | xargs -n1 basename || echo "  No packages found" && \
+    echo "" && \
+    echo "Total node_modules size:" && \
+    du -sh /app/node_modules 2>/dev/null || echo "  node_modules size: N/A" && \
+    echo "=========================================" && \
+    echo ""
+
+# ============================================================================
+# Builder Stage - 소스 컴파일 (소스 변경 시에만 재빌드)
+# ============================================================================
+FROM dependencies AS builder
+
+ARG APP
+
+WORKDIR /app
+
+# ⭐ Step 6: 소스코드 복사
+# packages는 이미 dependencies stage에서 복사했으므로
+# 여기서는 apps만 추가로 복사하면 됨
+COPY apps/ ./apps/
+
+# turbo.json 등 빌드에 필요한 루트 설정 파일들
+COPY turbo.json* ./
+
+# ⭐⭐⭐ Step 6.5: node_modules 상태 확인 및 재설치
+# Multi-stage build에서 workspace 링크가 깨지므로 전체 재설치 필요
+RUN echo "=========================================" && \
+    echo "🔍 Verifying Dependencies for Build" && \
+    echo "=========================================" && \
+    echo "Checking inherited node_modules:" && \
+    if [ -d "/app/node_modules" ]; then \
+        echo "  ✓ Root node_modules exists" && \
+        echo "  Size: $(du -sh /app/node_modules 2>/dev/null | cut -f1)"; \
+    else \
+        echo "  ✗ Root node_modules MISSING - CRITICAL ERROR" && \
+        exit 1; \
+    fi && \
+    echo "" && \
+    echo "Checking critical build tools:" && \
+    test -f /app/node_modules/.bin/env-cmd && echo "  ✓ env-cmd available" || echo "  ✗ env-cmd MISSING" && \
+    test -f /app/node_modules/.bin/next && echo "  ✓ next available" || echo "  ✗ next MISSING" && \
+    test -f /app/node_modules/.bin/tailwindcss && echo "  ✓ tailwindcss available" || echo "  ✗ tailwindcss MISSING" && \
+    echo "" && \
+    echo "🔄 Re-installing workspace dependencies (full install):" && \
+    pnpm install --no-frozen-lockfile --shamefully-hoist && \
+    echo "  ✓ Dependencies re-installed successfully" && \
+    echo "" && \
+    echo "Verifying env-cmd after reinstall:" && \
+    ls -la /app/node_modules/.bin/env-cmd && \
+    if [ -d "apps/${APP}" ]; then \
+        echo "Checking app-level node_modules link:" && \
+        ls -la apps/${APP}/node_modules/.bin/env-cmd 2>/dev/null || echo "  (App uses hoisted node_modules)"; \
+    fi && \
+    echo "=========================================" && \
+    echo ""
+
+# ⭐ Step 7: 빌드 실행 (개발 환경용)
+RUN echo "=========================================" && \
+    echo "🔨 Building Application (Development)" && \
+    echo "=========================================" && \
+    echo "Target APP: ${APP}" && \
+    echo "Node Version: $(node --version)" && \
+    echo "PNPM Version: $(pnpm --version)" && \
+    echo "=========================================" && \
+    echo "" && \
+    echo "--- Pre-Build Directory Check ---" && \
+    ls -la apps/${APP}/ && \
+    echo "" && \
+    echo "--- Build Tool Availability ---" && \
+    echo "PATH: $PATH" && \
+    which env-cmd 2>/dev/null || echo "env-cmd not in PATH (will use from node_modules/.bin)" && \
+    /app/node_modules/.bin/env-cmd --version 2>/dev/null || echo "env-cmd direct path check failed" && \
+    echo "" && \
+    echo "=========================================" && \
+    echo "🔍 Detecting Available Build Script" && \
+    echo "=========================================" && \
+    BUILD_SCRIPT="" && \
+    cd /app && \
+    if grep -q '"build:dev"' apps/${APP}/package.json; then \
+        BUILD_SCRIPT="build:dev" && \
+        echo "✓ Found: build:dev"; \
+    elif grep -q '"build"' apps/${APP}/package.json; then \
+        BUILD_SCRIPT="build" && \
+        echo "✓ Found: build (using as fallback)"; \
+    else \
+        echo "❌ No build script found in package.json!" && \
+        cat apps/${APP}/package.json | grep -A 10 '"scripts"' && \
+        exit 1; \
+    fi && \
+    echo "" && \
+    echo "Selected build script: ${BUILD_SCRIPT}" && \
+    echo "" && \
+    PRE_SCRIPT="pre${BUILD_SCRIPT}" && \
+    if grep -q "\"${PRE_SCRIPT}\"" apps/${APP}/package.json; then \
+        echo "Running pre-build script: ${PRE_SCRIPT}" && \
+        pnpm --filter ${APP} run ${PRE_SCRIPT} || echo "⚠️  Pre-build script failed, continuing..."; \
+        echo ""; \
+    fi && \
+    echo "=========================================" && \
+    echo "🚀 Starting Build Process" && \
+    echo "=========================================" && \
+    echo "Command: pnpm --filter ${APP} ${BUILD_SCRIPT}" && \
+    echo "" && \
+    pnpm --filter ${APP} ${BUILD_SCRIPT} && \
+    echo "" && \
+    echo "=========================================" && \
+    echo "✅ Build Completed Successfully" && \
+    echo "=========================================" && \
+    echo "" && \
+    if [ -d "apps/${APP}/.next" ]; then \
+        echo "📦 Build Output (.next directory):" && \
+        ls -lh apps/${APP}/.next/ | head -20 && \
+        echo "" && \
+        echo "Total .next size:" && \
+        du -sh apps/${APP}/.next && \
+        echo "" && \
+        if [ -d "apps/${APP}/.next/standalone" ]; then \
+            echo "✓ Standalone build detected" && \
+            echo "Standalone size:" && \
+            du -sh apps/${APP}/.next/standalone; \
+        else \
+            echo "⚠️  Standalone directory not found (might be using regular build mode)"; \
+        fi; \
+    else \
+        echo "❌ CRITICAL: .next directory not found!" && \
+        echo "Available directories in apps/${APP}/:" && \
+        ls -la apps/${APP}/ && \
+        exit 1; \
+    fi && \
+    echo "=========================================" && \
+    echo "" && \
+    echo "🧹 Cleanup: Removing build caches..." && \
+    rm -rf /root/.npm /tmp/* /root/.cache && \
+    pnpm store prune || true && \
+    echo "✓ Cleanup completed" && \
+    echo ""
+
+# ============================================================================
+# Runtime Stage - 최종 실행 이미지 (Standalone 모드용) ⭐ 권장
+# ============================================================================
+FROM ${BASE_IMAGE} AS runtime-standalone
+
+ARG APP
+
+# 타임존 및 환경 설정
+ENV TZ=Asia/Seoul \
+    NODE_ENV=development \
+    PORT=3000 \
+    HOSTNAME="0.0.0.0"
+
+# 최소 패키지만 설치
+RUN apk add --no-cache \
+    tzdata \
+    curl \
+    ca-certificates && \
+    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
+    echo $TZ > /etc/timezone && \
+    rm -rf /root/.npm /tmp/*
+
+WORKDIR /app
+
+# ⭐ Next.js standalone 모드 출력물만 복사 (용량 최소화)
+COPY --from=builder --chown=node:node /app/apps/${APP}/.next/standalone ./
+
+# Static 파일과 Public 디렉토리 복사
+COPY --from=builder --chown=node:node /app/apps/${APP}/.next/static ./apps/${APP}/.next/static
+COPY --from=builder --chown=node:node /app/apps/${APP}/public ./apps/${APP}/public
+
+# 보안: non-root 유저로 실행
+USER node
+
+# 런타임 검증
+RUN echo "=========================================" && \
+    echo "🚀 Standalone Runtime (Development)" && \
+    echo "=========================================" && \
+    echo "App: ${APP}" && \
+    echo "Node: $(node --version)" && \
+    echo "User: $(whoami)" && \
+    echo "Working Directory: $(pwd)" && \
+    echo "" && \
+    echo "Directory structure:" && \
+    ls -la . && \
+    echo "" && \
+    echo "Checking server.js location:" && \
+    if [ -f "apps/${APP}/server.js" ]; then \
+        echo "  ✓ Found at: apps/${APP}/server.js" && \
+        ls -lh apps/${APP}/server.js; \
+    elif [ -f "server.js" ]; then \
+        echo "  ✓ Found at: ./server.js" && \
+        ls -lh server.js; \
+    else \
+        echo "  ✗ server.js not found!" && \
+        echo "  Available files:" && \
+        find . -name "server.js" -o -name "*.js" | head -10; \
+    fi && \
+    echo "========================================="
+
+# 헬스체크 (K8s probe용)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:${PORT}/api/health || \
+      curl -f http://localhost:${PORT}/ || exit 1
+
+EXPOSE ${PORT}
+
+# ⭐ Standalone 모드 실행
+# ARG를 CMD에서 직접 사용할 수 없으므로 ENV로 전달
+ENV APP_NAME=${APP}
+CMD node apps/${APP_NAME}/server.js
+
+# ============================================================================
+# 메타데이터
+# ============================================================================
+LABEL app="${APP}" \
+      maintainer="goyoai-devops@goyoai.com" \
+      description="GoyoAI Frontend System - ${APP}" \
+      version="1.0-dev" \
+      environment="development" \
+      node.version="${NODE_VERSION}" \
+      build.type="standalone-development"

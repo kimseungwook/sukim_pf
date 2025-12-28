@@ -1,5 +1,5 @@
 # values.yaml
-gitUrl: "https://github.com/GoyoAi-Service/goyoai-backend-system"
+gitUrl: "https://github.com/kimseungwook/sukim_pf"
 gitRevisions: ["main","dev"]
 
 # EventListener 설정
@@ -21,8 +21,8 @@ trigger_tolerations_effect: "NoSchedule"
 
 # Container images
 container_registry_secretName: "harbor-registry-secret"
-common_alpine_url: "harbor.8ai.store/common/alpine:3.20.3"
-common_alpine_git_url: "harbor.8ai.store/common/git:2.45.2"
+common_alpine_url: "harbor.8ai.store/common/alpine:3.21"
+common_alpine_git_url: "harbor.8ai.store/common/git:2.52.0"
 container_registry_url: "harbor.8ai.store/ecommerce-backend"
 container_registry_cache_url: "harbor.8ai.store/ecommerce-backend-cache"
 
@@ -44,7 +44,7 @@ project_name: "ecommerce-backend"
 system_build_task_name: "ecommerce-backend-image-build"
 
 #dockerfile 
-docker_unified: "Dockerfile.backend"
+docker_backend: "application/ecommerce-react/backend/Dockerfile.backend"
 
 # Slack
 slack_webhook_url: "https://hooks.slack.com/services/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"

@@ -1,0 +1,118 @@
+# Dockerfile.frontend
+# Optimized Dockerfile for ecommerce-react React+Vite Frontend
+# Optimized for OKE Virtual Node (Harbor Layer Cache only, no PVC)
+#
+# Usage: docker build -f Dockerfile.frontend -t ecommerce-frontend:latest .
+
+ARG NODE_VERSION=20.18.3
+ARG ALPINE_VERSION=3.21
+
+# ============================================================================
+# Dependencies Stage - npm 의존성 다운로드 (Layer Cache 활용)
+# ============================================================================
+FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS dependencies
+
+WORKDIR /app
+
+# ⭐ Step 1: package.json과 lock 파일만 먼저 복사 (거의 변하지 않음)
+COPY package.json package-lock.json ./
+
+# ⭐ Step 2: 의존성만 다운로드 (이 Layer는 package.json 변경 시에만 재빌드)
+RUN echo "=========================================" && \
+    echo "📦 Downloading NPM Dependencies" && \
+    echo "=========================================" && \
+    echo "Project: ecommerce-react-frontend" && \
+    echo "Node Version: $(node --version)" && \
+    echo "NPM Version: $(npm --version)" && \
+    echo "=========================================" && \
+    echo "" && \
+    npm ci --no-audit --no-fund && \
+    echo "" && \
+    echo "✅ Dependencies downloaded successfully" && \
+    echo ""
+
+# ============================================================================
+# Builder Stage - 소스 컴파일 (소스 변경 시에만 재빌드)
+# ============================================================================
+FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS builder
+
+WORKDIR /app
+
+# ⭐ Step 3: 다운로드된 node_modules 복사 (dependencies stage에서)
+COPY --from=dependencies /app/node_modules ./node_modules
+
+# ⭐ Step 4: 소스코드 복사 (이 Layer는 소스 변경 시에만 재빌드)
+COPY . .
+
+# ⭐ Step 5: 빌드 실행 (Vite build)
+RUN echo "=========================================" && \
+    echo "🔨 Building React Application (Vite)" && \
+    echo "=========================================" && \
+    echo "Project: ecommerce-react-frontend" && \
+    echo "Node Version: $(node --version)" && \
+    echo "Build Tool: Vite" && \
+    echo "=========================================" && \
+    echo "" && \
+    npm run build && \
+    echo "" && \
+    echo "=========================================" && \
+    echo "✅ Build Completed" && \
+    echo "=========================================" && \
+    echo "" && \
+    if [ -d "dist" ]; then \
+        echo "📦 Build Output (dist directory):" && \
+        ls -lh dist/ && \
+        echo "" && \
+        echo "Total dist size:" && \
+        du -sh dist && \
+        echo ""; \
+    else \
+        echo "❌ CRITICAL: dist directory not found!" && \
+        echo "Available directories:" && \
+        ls -la && \
+        exit 1; \
+    fi && \
+    echo "=========================================" && \
+    echo "" && \
+    # 빌드 최적화: 불필요한 파일 제거
+    rm -rf /root/.npm /tmp/* /root/.cache 2>/dev/null || true
+
+# ============================================================================
+# Runtime Stage - Nginx로 정적 파일 서빙 (경량화)
+# ============================================================================
+FROM nginx:1.27-alpine
+
+# 타임존 설정
+ENV TZ=Asia/Seoul
+RUN apk add --no-cache tzdata && \
+    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
+    echo $TZ > /etc/timezone
+
+WORKDIR /usr/share/nginx/html
+
+# 기본 nginx 파일 제거
+RUN rm -rf /usr/share/nginx/html/*
+
+# 빌드된 dist 파일 복사
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Nginx 설정 파일 복사
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# 헬스체크 (Kubernetes에서 사용)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
+
+# 메타데이터
+LABEL maintainer="sukim-pf@example.com" \
+      description="Ecommerce React - Frontend (React + Vite)" \
+      version="1.0" \
+      app="ecommerce-frontend" \
+      node.version="${NODE_VERSION}" \
+      build.tool="vite"
+
+# 포트 노출
+EXPOSE 80
+
+# Nginx 실행
+CMD ["nginx", "-g", "daemon off;"]

@@ -90,7 +90,7 @@ COPY --from=builder /app/policy /app/policy
 COPY --from=builder /app/configs /app/configs
 
 # Entrypoint 스크립트 복사 (있는 경우)
-COPY entrypoint.sh /entrypoint.sh
+COPY --from=builder /app/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # 헬스체크 (Kubernetes에서 사용)

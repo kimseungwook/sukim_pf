@@ -20,7 +20,7 @@ spec:
 
   steps:
     - name: generate-timestamp
-      image: gdhb.goyoai.com/common/alpine:3.20.3
+      image: gdhb.goyoai.com/common/alpine:3.21
       #image: alpine
       script: |
         #!/bin/sh
