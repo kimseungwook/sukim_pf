@@ -67,8 +67,8 @@ spec:
         SAFE_BRANCH_NAME=$(echo "$GIT_BRANCH" | sed 's/\//-/g')
 
         if [ "$GIT_BRANCH" = "main" ] || [ "$GIT_BRANCH" = "master" ]; then
-          # main/master 브랜치는 prod 경로 사용
-          KUSTOMIZE_DIR="overlays/prod/${MODULE_NAME}"
+          # main/master 브랜치는 dev 경로 사용
+          KUSTOMIZE_DIR="overlays/dev/${MODULE_NAME}"
           DEPLOYMENT_NAME="${MODULE_NAME}"
         elif [ "$GIT_BRANCH" = "dev" ]; then
           # dev 브랜치는 dev 경로 사용
