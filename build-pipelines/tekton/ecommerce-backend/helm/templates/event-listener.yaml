@@ -47,9 +47,9 @@ spec:
                   body.head_commit.message.contains('[bd:backend]') ||
                   body.head_commit.message.contains('[bd:ecommerce]') ||
                   body.head_commit.message.contains('[bd:all]') ||
-                  body.commits.exists(c, c.added.exists(f, f.startsWith('application/ecommerce-react/backend/'))) ||
-                  body.commits.exists(c, c.modified.exists(f, f.startsWith('application/ecommerce-react/backend/'))) ||
-                  body.commits.exists(c, c.removed.exists(f, f.startsWith('application/ecommerce-react/backend/')))
+                  body.commits.exists(c, c.added.exists(f, f.startsWith('application/ecommerce/backend/'))) ||
+                  body.commits.exists(c, c.modified.exists(f, f.startsWith('application/ecommerce/backend/'))) ||
+                  body.commits.exists(c, c.removed.exists(f, f.startsWith('application/ecommerce/backend/')))
                 )
             - name: "overlays"
               value:
