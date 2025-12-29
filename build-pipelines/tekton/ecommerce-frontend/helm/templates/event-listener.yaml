@@ -60,6 +60,8 @@ spec:
                   expression: "body.head_commit.id.truncate(7)"
                 - key: branch_name
                   expression: "body.ref.split('/')[2]"
+                - key: safe_branch_name
+                  expression: "body.ref.split('/')[2].replace('/', '-')"
                 - key: module_name
                   expression: "'ecommerce-frontend'"
                 - key: dockerfile_name
