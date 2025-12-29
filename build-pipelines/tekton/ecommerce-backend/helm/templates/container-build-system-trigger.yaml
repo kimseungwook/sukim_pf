@@ -45,7 +45,7 @@ spec:
   
   steps:
     - name: create-kaniko-job
-      image: "gdhb.goyoai.com/common/kubectl:1.34.2"
+      image: "harbor.8ai.store/common/kubectl:1.34.2"
       script: |
         #!/bin/sh
         set -e
@@ -55,10 +55,10 @@ spec:
         MODULE_NAME="$(params.module-name)"
         
         if echo "${MODULE_NAME}" | grep -qE "(system|scheduler|message|portal|backoffice)"; then
-          BASE_IMAGE="gdhb.goyoai.com/common/openjdk:17-jdk-oraclelinux8-otel-2.21.0"
+          BASE_IMAGE="harbor.8ai.store/common/openjdk:17-jdk-oraclelinux8-otel-2.21.0"
           echo "✓ Module '${MODULE_NAME}' will use OpenTelemetry base image"
         else
-          BASE_IMAGE="gdhb.goyoai.com/common/openjdk:17-jdk-oraclelinux8"
+          BASE_IMAGE="harbor.8ai.store/common/openjdk:17-jdk-oraclelinux8"
           echo "✓ Module '${MODULE_NAME}' will use standard base image"
         fi
         
@@ -96,7 +96,7 @@ spec:
               serviceAccountName: tekton-ci-token
               containers:
               - name: kaniko-build
-                image: gdhb.goyoai.com/common/kaniko-git:v1.23.2
+                image: harbor.8ai.store/common/kaniko-git:v1.23.2
                 command:
                 - /busybox/sh
                 - -c
@@ -375,7 +375,7 @@ spec:
           mountPath: /tmp
     
     - name: wait-for-job
-      image: "gdhb.goyoai.com/common/kubectl:1.34.2"
+      image: "harbor.8ai.store/common/kubectl:1.34.2"
       script: |
         #!/bin/sh
         set -e
