@@ -4,10 +4,10 @@ gitRevisions: ["main","dev"]
 
 # EventListener 설정
 el_serviceAccountName: "tekton-triggers-sa"
-el_node_selector_key: "service"
-el_node_selector_value: "tools"
-el_tolerations_key: "service"
-el_tolerations_value: "tools"
+el_node_selector_key: "node-type"
+el_node_selector_value: "virtual"
+el_tolerations_key: "workload"
+el_tolerations_value: "sukim-build"
 el_tolerations_operator: "Equal"
 el_tolerations_effect: "NoSchedule"
 

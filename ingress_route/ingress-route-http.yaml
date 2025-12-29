@@ -132,6 +132,16 @@ spec:
         - name: redirect-http-https
       services:
         - kind: Service
+          name: el-ecommerce-backend
+          namespace: tekton-pipelines
+          port: 8080
+
+    - kind: Rule
+      match: Host(`efevtrg.8ai.store`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
           name: el-ecommerce-frontend
           namespace: tekton-pipelines
           port: 8080

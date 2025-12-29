@@ -212,6 +212,14 @@ spec:
       match: Host(`ebevtrg.8ai.store`)
       priority: 10
       services:
+        - name: el-ecommerce-backend
+          namespace: tekton-pipelines
+          port: 8080
+    
+    - kind: Rule
+      match: Host(`efevtrg.8ai.store`)
+      priority: 10
+      services:
         - name: el-ecommerce-frontend
           namespace: tekton-pipelines
           port: 8080
