@@ -2,7 +2,7 @@
 # Optimized Dockerfile for ecommerce-react React+Vite Frontend
 # Optimized for OKE Virtual Node (Harbor Layer Cache only, no PVC)
 #
-# Usage: docker build -f Dockerfile.frontend -t ecommerce-frontend:latest .
+# Usage: docker build -f Dockerfile.frontend -t ecommerce-frontend:latest . 
 
 ARG NODE_VERSION=20.18.3
 ARG ALPINE_VERSION=3.21

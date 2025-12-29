@@ -217,11 +217,12 @@ spec:
                   fi
                   
                   # ==========================================
-                  # Dockerfile 경로 탐색 (단순화됨)
+                  # Dockerfile 경로 탐색
                   # ==========================================
                   echo "=== Dockerfile Path Check ==="
-                  DOCKERFILE_PATH="/workspace/$(params.dockerfile-name)"
-                  echo "Checking expected path: \${DOCKERFILE_PATH}"
+                  # ecommerce-frontend는 단일 앱 구조
+                  CONTEXT_DIR="/workspace/{{ .Values.frontend_context_dir }}"
+                  DOCKERFILE_PATH="\${CONTEXT_DIR}/Dockerfile.frontend"
                   
                   if [ -f "\${DOCKERFILE_PATH}" ]; then
                     echo "✓ Dockerfile found at: \${DOCKERFILE_PATH}"
@@ -263,7 +264,7 @@ spec:
                   IMAGE_TAG="$(params.container-registry-url)/$(params.module-name):$(params.git-short-sha)-$(params.timestamp)"
                   echo "Image: \${IMAGE_TAG}"
                   echo "Dockerfile: \${DOCKERFILE_PATH}"
-                  echo "Context: /workspace"
+                  echo "Context: \${CONTEXT_DIR}"
                   echo "Module: $(params.module-name)"
                   echo ""
                   
@@ -271,7 +272,7 @@ spec:
                   echo "Relative Dockerfile path: \${RELATIVE_DOCKERFILE}"
                   echo ""
                   
-                  cd /workspace
+                  cd \${CONTEXT_DIR}
                   
                   echo "=== Build Configuration ==="
                   echo "Dockerfile: \${DOCKERFILE_PATH}"
@@ -314,9 +315,8 @@ spec:
                   echo "Target Args: \${TARGET_ARGS}"
                   echo ""    
 
-                  # ⭐ Kaniko 실행
                   /kaniko/executor \
-                    --context=/workspace \
+                    --context=\${CONTEXT_DIR} \
                     --dockerfile=\${RELATIVE_DOCKERFILE} \
                     --destination=\${IMAGE_TAG} \
                     \${BUILD_ARGS} \
