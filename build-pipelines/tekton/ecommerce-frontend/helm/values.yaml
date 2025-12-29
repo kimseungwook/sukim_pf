@@ -1,0 +1,48 @@
+# values.yaml - ecommerce-frontend
+gitUrl: "https://github.com/kimseungwook/sukim_pf"
+gitRevisions: ["main","dev"]
+
+# EventListener 설정
+el_serviceAccountName: "tekton-triggers-sa"
+el_node_selector_key: "service"
+el_node_selector_value: "tools"
+el_tolerations_key: "service"
+el_tolerations_value: "tools"
+el_tolerations_operator: "Equal"
+el_tolerations_effect: "NoSchedule"
+
+# 일반 Task용 노드 설정
+trigger_node_selector_key: "service"
+trigger_node_selector_value: "tools"
+trigger_tolerations_key: "service"
+trigger_tolerations_value: "tools"
+trigger_tolerations_operator: "Equal"
+trigger_tolerations_effect: "NoSchedule"
+
+# Container images
+container_registry_secretName: "harbor-registry-secret"
+common_alpine_url: "harbor.8ai.store/common/alpine:3.21"
+common_alpine_git_url: "harbor.8ai.store/common/git:2.52.0"
+container_registry_url: "harbor.8ai.store/ecommerce-frontend"
+container_registry_cache_url: "harbor.8ai.store/ecommerce-frontend-cache"
+
+# Kustomize 설정
+kustomize_git_url: "https://github.com/kimseungwook/ecommerce-deploy-kustomize.git"
+frontend_kustomize_git_branch: "main"
+
+manifestFileName: "ecommerce-frontend-manifest.yaml"
+commitMessage: "Update Kubernetes manifest"
+
+# 프로젝트 설정
+project_name: "ecommerce-frontend"
+
+# Task 이름
+frontend_build_task_name: "ecommerce-frontend-image-build"
+
+# Frontend 빌드 설정
+dockerfile_frontend: "application/ecommerce/frontend/Dockerfile.frontend"
+frontend_context_dir: "application/ecommerce/frontend"
+
+# Slack
+slack_webhook_url: "https://hooks.slack.com/services/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"
+slack_message: "Build completed"

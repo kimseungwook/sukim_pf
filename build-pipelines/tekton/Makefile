@@ -1,9 +1,9 @@
-.PHONY: all backend backend-portal backend-portal-scheduler frontend-vuejs frontend-react frontend-old ai-server crawler goyoai-web-page rms frontend-system backend-system backend-portal-system front-back-office backend-aify kustomize-patch goyoai-stock-web goyoai-backend-system goyoai-frontend-web goyoai-ai-server ecommerce-backend
+.PHONY: all backend backend-portal backend-portal-scheduler frontend-vuejs frontend-react frontend-old ai-server crawler goyoai-web-page rms frontend-system backend-system backend-portal-system front-back-office backend-aify kustomize-patch goyoai-stock-web goyoai-backend-system goyoai-frontend-web goyoai-ai-server ecommerce-backend ecommerce-frontend
 
 DESTINATION=./packages
 DOCKER_REG=oci://gdhb.goyoai.com/tekton
 
-all: backend backend-portal backend-portal-scheduler frontend-vuejs frontend-react frontend-old ai-server crawler goyoai-web-page rms frontend-system backend-system backend-portal-system goyoai-stock-web goyoai-backend-system goyoai-frontend-web goyoai-ai-server ecommerce-backend
+all: backend backend-portal backend-portal-scheduler frontend-vuejs frontend-react frontend-old ai-server crawler goyoai-web-page rms frontend-system backend-system backend-portal-system goyoai-stock-web goyoai-backend-system goyoai-frontend-web goyoai-ai-server ecommerce-backend ecommerce-frontend
 
 backend:
 	helm package ./backend/helm --destination $(DESTINATION)
@@ -114,3 +114,8 @@ ecommerce-backend:
 	helm package ./ecommerce-backend/helm --destination $(DESTINATION)
 	helm push $(DESTINATION)/ecommerce-backend-0.1.0.tgz $(DOCKER_REG)/
 	helm upgrade --install ecommerce-backend -n tekton-pipelines $(DOCKER_REG)/ecommerce-backend --version 0.1.0
+
+ecommerce-frontend:
+	helm package ./ecommerce-frontend/helm --destination $(DESTINATION)
+	helm push $(DESTINATION)/ecommerce-frontend-0.1.0.tgz $(DOCKER_REG)/
+	helm upgrade --install ecommerce-frontend -n tekton-pipelines $(DOCKER_REG)/ecommerce-frontend --version 0.1.0

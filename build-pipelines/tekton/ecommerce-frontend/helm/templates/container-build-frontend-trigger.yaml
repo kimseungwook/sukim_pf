@@ -1,0 +1,557 @@
+# ecommerce-frontend container-build-trigger
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  # ❗️ 1. values.yaml의 'frontend_build_task_name' 값을 사용
+  name: {{ .Values.frontend_build_task_name }}-trigger
+  namespace: tekton-pipelines
+spec:
+  description: >-
+    This Task triggers a Kaniko Job on Virtual Node for Frontend builds.
+  params:
+    # (파라미터는 백엔드와 동일하게 유지)
+    - name: container-registry-url
+      type: string
+    - name: container-registry-cache-url
+      type: string
+    - name: timestamp
+      type: string
+    - name: project-name
+      type: string
+      default: {{ .Values.project_name }}
+    - name: git-short-sha
+      type: string
+    - name: module-name
+      type: string
+      description: "The module to build (e.g., goyoai-aify-web)"
+    - name: dockerfile-name
+      type: string
+      description: "The Dockerfile to use (e.g., Dockerfile.frontend.unified)"
+    - name: giturl
+      type: string
+    - name: revision
+      type: string
+  
+  workspaces:
+    - name: {{ .Values.project_name }}
+      description: Not used, but kept for compatibility
+  
+  results:
+    - name: image-url
+      description: The built image URL
+  
+  steps:
+    - name: create-kaniko-job
+      image: {{ .Values.common_alpine_url }}
+      script: |
+        #!/bin/sh
+        set -e
+        apk add --no-cache curl
+        
+        echo "Detecting architecture..."
+        ARCH=$(uname -m)
+        if [ "$ARCH" = "aarch64" ]; then
+          K8S_ARCH="arm64"
+        elif [ "$ARCH" = "x86_64" ]; then
+          K8S_ARCH="amd64"
+        else
+          echo "Unsupported architecture: $ARCH"
+          exit 1
+        fi
+        echo "Architecture detected: $ARCH (using ${K8S_ARCH} for kubectl)"
+
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${K8S_ARCH}/kubectl"
+        chmod +x kubectl
+        mv kubectl /usr/local/bin/
+
+        JOB_NAME="kaniko-build-$(params.module-name)-$(params.timestamp)"
+
+        
+        echo ""
+
+        cat <<EOF | kubectl apply --validate=false -f -
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: ${JOB_NAME}
+          namespace: tekton-pipelines
+          labels:
+            tekton-trigger: "true"
+            job-name: ${JOB_NAME}
+            module: $(params.module-name)
+        spec:
+          ttlSecondsAfterFinished: 3600
+          backoffLimit: 0
+          template:
+            metadata:
+              labels:
+                app: kaniko-build
+                job-name: ${JOB_NAME}
+                module: $(params.module-name)
+            spec:
+              nodeSelector:
+                workload-type: build
+              tolerations:
+              - key: workload
+                operator: Equal
+                value: sukim-build
+                effect: NoSchedule
+              restartPolicy: Never
+              serviceAccountName: tekton-ci-token
+              containers:
+              - name: kaniko-build
+                image: harbor.8ai.store/common/kaniko-git:v1.23.2
+                command:
+                - /busybox/sh
+                - -c
+                - |
+                  #!/bin/sh
+                  set -e
+                  
+                  echo "=== Starting Frontend Build Process ==="
+                  
+                  # ==========================================
+                  # 🔥 NEW: Secret에서 .env 파일 생성
+                  # ==========================================
+                  echo "=== Preparing Environment Variables ==="
+                  MODULE_NAME="$(params.module-name)"
+                  APP_NAME="\${MODULE_NAME}"
+                  SECRET_NAME="\${MODULE_NAME}-development"
+                  
+                  echo "Module: \${MODULE_NAME}"
+                  echo "App: \${APP_NAME}"
+                  echo "Secret: \${SECRET_NAME}"
+                  echo ""
+                  
+                  # Secret이 마운트된 경로에서 .env 파일 생성
+                  if [ -d "/secrets/env-vars" ]; then
+                    ENV_FILE="/tmp/.env.production.local"
+                    
+                    echo "✓ Secret mounted, creating .env file"
+                    
+                    # Secret의 모든 키를 .env 형식으로 변환
+                    for file in /secrets/env-vars/*; do
+                      if [ -f "\${file}" ]; then
+                        key=\$(basename "\${file}")
+                        value=\$(cat "\${file}")
+                        echo "\${key}=\${value}" >> "\${ENV_FILE}"
+                      fi
+                    done
+                    
+                    echo "✅ Environment file created: \${ENV_FILE}"
+                    echo "📋 Variables count: \$(wc -l < "\${ENV_FILE}")"
+                    echo ""
+                    echo "🔍 Environment Variables (Debugging):"
+                    echo "========================================="
+                    
+                    # 민감한 정보 마스킹하여 출력
+                    while IFS='=' read -r key value || [ -n "\${key}" ]; do
+                      if [ -n "\${key}" ] && [ "\${key#\#}" = "\${key}" ]; then
+                        if echo "\${key}" | grep -qiE '(SECRET|KEY|PASSWORD|TOKEN|CLIENT_ID)'; then
+                          VALUE_LENGTH=\${#value}
+                          if [ \${VALUE_LENGTH} -gt 0 ]; then
+                            echo "  \${key}=****** (length: \${VALUE_LENGTH})"
+                          else
+                            echo "  \${key}=(empty) ⚠️"
+                          fi
+                        else
+                          echo "  \${key}=\${value}"
+                        fi
+                      fi
+                    done < "\${ENV_FILE}"
+                    
+                    echo "========================================="
+                    echo ""
+                  else
+                    echo "⚠️  Secret not mounted at /secrets/env-vars"
+                    echo "⚠️  Build will proceed without environment variables"
+                    ENV_FILE=""
+                  fi
+                  
+                  # ==========================================
+                  # Git Credentials (동일)
+                  # ==========================================
+                  echo "=== Git Credentials ==="
+                  if [ -f /secrets/git-token/username ] && [ -f /secrets/git-token/password ]; then
+                    GIT_USERNAME=\$(cat /secrets/git-token/username)
+                    GIT_PASSWORD=\$(cat /secrets/git-token/password)
+                    git config --global credential.helper store
+                    mkdir -p /root
+                    echo "https://\${GIT_USERNAME}:\${GIT_PASSWORD}@github.com" > /root/.git-credentials
+                    chmod 600 /root/.git-credentials
+                    echo "✓ Git credentials configured"
+                  fi
+                  
+                  # ==========================================
+                  # Git Clone (동일)
+                  # ==========================================
+                  echo "=== Git Clone ==="
+                  git config --global user.name "Tekton CI"
+                  git config --global user.email "ci@sukim-pf.com"
+                  git config --global --add safe.directory /workspace
+                  
+                  if git clone -b $(params.revision) $(params.giturl) /workspace; then
+                    cd /workspace
+                    echo "✓ Clone successful (commit: \$(git rev-parse --short HEAD))"
+                  else
+                    echo "✗ Clone failed"
+                    exit 1
+                  fi
+                  
+                  # ==========================================
+                  # 🔥 NEW: .env 파일을 앱 디렉토리로 복사
+                  # ==========================================
+                  if [ -n "\${ENV_FILE}" ] && [ -f "\${ENV_FILE}" ]; then
+                    # 앱 디렉토리는 전체 모듈명 사용 (goyoai-xxx-web)
+                    APP_DIR="/workspace/apps/\${MODULE_NAME}"
+                    
+                    if [ -d "\${APP_DIR}" ]; then
+                      cp "\${ENV_FILE}" "\${APP_DIR}/.env.production.local"
+                      echo "✓ .env copied to \${APP_DIR}/.env.production.local"
+                      echo ""
+                    else
+                      echo "⚠️  App directory not found: \${APP_DIR}"
+                      echo "⚠️  Available apps:"
+                      ls -d /workspace/apps/*/ 2>/dev/null || echo "  No apps found"
+                    fi
+                  fi
+                  
+                  # ==========================================
+                  # Dockerfile 경로 탐색 (단순화됨)
+                  # ==========================================
+                  echo "=== Dockerfile Path Check ==="
+                  DOCKERFILE_PATH="/workspace/$(params.dockerfile-name)"
+                  echo "Checking expected path: \${DOCKERFILE_PATH}"
+                  
+                  if [ -f "\${DOCKERFILE_PATH}" ]; then
+                    echo "✓ Dockerfile found at: \${DOCKERFILE_PATH}"
+                    ls -lh "\${DOCKERFILE_PATH}"
+                  else
+                    echo "✗ CRITICAL: Dockerfile NOT found at: \${DOCKERFILE_PATH}"
+                    echo "Searching for dockerfile in workspace..."
+                    find /workspace -maxdepth 1 -iname "*dockerfile*" -type f 2>/dev/null || echo "No dockerfiles found"
+                    exit 1
+                  fi
+                  
+                  # ==========================================
+                  # Pre-authenticate with Registry (동일)
+                  # ==========================================
+                  echo "=== Pre-authenticating with Registry ==="
+                  
+                  if [ -f /kaniko/.docker/config.json ]; then
+                    echo "✓ Harbor config found"
+                    
+                    REGISTRY_HOST="harbor.8ai.store"
+                    TEST_IMAGE="\${REGISTRY_HOST}/common/alpine:latest"
+                    
+                    echo "Testing authentication with: \${TEST_IMAGE}"
+                    
+                    if crane manifest \${TEST_IMAGE} > /dev/null 2>&1; then
+                      echo "✓ Authentication successful"
+                    else
+                      echo "⚠️  Authentication test failed, but proceeding"
+                    fi
+                  else
+                    echo "✗ Harbor config not found at /kaniko/.docker/config.json"
+                    exit 1
+                  fi
+                  
+                  # ==========================================
+                  # ⭐ Kaniko Build
+                  # ==========================================
+                  echo "=== Kaniko Build ==="
+                  IMAGE_TAG="$(params.container-registry-url)/$(params.module-name):$(params.git-short-sha)-$(params.timestamp)"
+                  echo "Image: \${IMAGE_TAG}"
+                  echo "Dockerfile: \${DOCKERFILE_PATH}"
+                  echo "Context: /workspace"
+                  echo "Module: $(params.module-name)"
+                  echo ""
+                  
+                  RELATIVE_DOCKERFILE=\$(echo "\${DOCKERFILE_PATH}" | sed 's|^/workspace/||' | sed 's|^|./|')
+                  echo "Relative Dockerfile path: \${RELATIVE_DOCKERFILE}"
+                  echo ""
+                  
+                  cd /workspace
+                  
+                  echo "=== Build Configuration ==="
+                  echo "Dockerfile: \${DOCKERFILE_PATH}"
+                  echo "Relative Path: \${RELATIVE_DOCKERFILE}"
+                  
+                  # 🔥 .env 파일 최종 확인
+                  if [ -f "/workspace/apps/\${MODULE_NAME}/.env.production.local" ]; then
+                    echo "✓ .env.production.local present in app directory"
+                    echo "  Variables: \$(wc -l < /workspace/apps/\${MODULE_NAME}/.env.production.local)"
+                  else
+                    echo "⚠️  .env.production.local not found in app directory"
+                  fi
+                  echo ""
+                  
+                  # ⭐ Dockerfile에 따라 빌드 전략 자동 선택
+                  BUILD_ARGS=""
+                  TARGET_ARGS=""
+                  
+                  # Dockerfile.frontend.unified인 경우
+                  if echo "\${DOCKERFILE_PATH}" | grep -q "Dockerfile.frontend.unified"; then
+                    echo "✓ Detected: Dockerfile.frontend.unified (Layer Cache Optimized)"
+                    # ⚠️ Dockerfile의 ARG APP는 전체 모듈명을 받음 (goyoai-xxx-web)
+                    # ⭐ Production 환경 ARG 추가
+                    BUILD_ARGS="--build-arg=APP=\${MODULE_NAME}"
+                    BUILD_ARGS="\${BUILD_ARGS} --build-arg=BASE_IMAGE=harbor.8ai.store/common/node:20.18.3-alpine3.21"
+                    BUILD_ARGS="\${BUILD_ARGS} --build-arg=ENVIRONMENT=production"
+                    BUILD_ARGS="\${BUILD_ARGS} --build-arg=PNPM_INSTALL_ARGS=--frozen-lockfile"
+                    BUILD_ARGS="\${BUILD_ARGS} --build-arg=BUILD_SCRIPT=build:prod"
+                    TARGET_ARGS="--target=runtime-standalone"
+                  # 기존 Dockerfile (dockerfile-*-prod 등)인 경우
+                  else
+                    echo "✓ Detected: Legacy Dockerfile (Standard Build)"
+                    # 기존 방식: ARG 체크 후 조건부 전달
+                    if grep -qE "(ARG APP_NAME|ARG MODULE_NAME)" "\${DOCKERFILE_PATH}"; then
+                      BUILD_ARGS="--build-arg=APP_NAME=\${APP_NAME} --build-arg=MODULE_NAME=\${APP_NAME}"
+                    fi
+                  fi
+                  
+                  echo "Build Args: \${BUILD_ARGS}"
+                  echo "Target Args: \${TARGET_ARGS}"
+                  echo ""    
+
+                  # ⭐ Kaniko 실행
+                  /kaniko/executor \
+                    --context=/workspace \
+                    --dockerfile=\${RELATIVE_DOCKERFILE} \
+                    --destination=\${IMAGE_TAG} \
+                    \${BUILD_ARGS} \
+                    \${TARGET_ARGS} \
+                    --force \
+                    --skip-tls-verify \
+                    --skip-push-permission-check \
+                    --skip-unused-stages \
+                    --use-new-run \
+                    --ignore-path=/var/spool/mail \
+                    --ignore-path=/var/mail \
+                    --ignore-path=/var/spool \
+                    --cache=true \
+                    --cache-ttl=168h \
+                    --cache-repo=$(params.container-registry-cache-url)/$(params.module-name) \
+                    --cache-copy-layers \
+                    --snapshot-mode=time \
+                    --compressed-caching=false \
+                    --ignore-var-run \
+                    --cleanup \
+                    --cache-dir=/cache \
+                    --verbosity=info
+                  
+                  BUILD_EXIT=\$?
+                  
+                  if [ \${BUILD_EXIT} -ne 0 ]; then
+                    echo ""
+                    echo "✗ Build failed with exit code \${BUILD_EXIT}"
+                    exit 1
+                  fi
+                  
+                  echo ""
+                  echo "=========================================="
+                  echo "✅ Build Complete!"
+                  echo "=========================================="
+                  echo "Image: \${IMAGE_TAG}"
+                  echo "Module: $(params.module-name)"
+                  if [ -n "\${TARGET_ARGS}" ]; then
+                    echo "Mode: Optimized (runtime-standalone)"
+                  else
+                    echo "Mode: Standard"
+                  fi
+                  echo "=========================================="
+
+                env:
+                - name: DOCKER_CONFIG
+                  value: "/kaniko/.docker"
+                volumeMounts:
+                - name: workspace
+                  mountPath: /workspace
+                - name: kaniko-cache
+                  mountPath: /cache
+                - name: git-credentials
+                  mountPath: /secrets/git-token
+                  readOnly: true
+                - name: harbor-config
+                  mountPath: /kaniko/.docker
+                  readOnly: true
+                - name: env-secrets
+                  mountPath: /secrets/env-vars
+                  readOnly: true
+                
+                resources:
+                  requests:
+                    memory: "8Gi"
+                    cpu: "4000m"
+                  limits:
+                    memory: "16Gi"
+                    cpu: "8000m"
+                    
+              volumes:
+              - name: workspace
+                emptyDir: {}
+              - name: kaniko-cache
+                emptyDir: {}
+              - name: git-credentials
+                secret:
+                  secretName: git-token
+              - name: harbor-config
+                secret:
+                  secretName: kaniko-secret
+                  items:
+                  - key: config.json
+                    path: config.json
+                    mode: 0644
+              - name: env-secrets
+                secret:
+                  secretName: $(params.module-name)-development
+                  optional: true
+        EOF
+        
+        echo "Job ${JOB_NAME} created successfully"
+        echo "${JOB_NAME}" > /tmp/job-name
+      volumeMounts:
+        - name: job-info
+          mountPath: /tmp
+    
+    # 'wait-for-job' 스텝은 백엔드와 동일하게 유지 (수정 필요 없음)
+    - name: wait-for-job
+      image: {{ .Values.common_alpine_url }}
+      script: |
+        #!/bin/sh
+        set -e
+        apk add --no-cache curl
+
+        echo "Detecting architecture..."
+        ARCH=$(uname -m)
+        if [ "$ARCH" = "aarch64" ]; then
+          K8S_ARCH="arm64"
+        elif [ "$ARCH" = "x86_64" ]; then
+          K8S_ARCH="amd64"
+        else
+          echo "Unsupported architecture: $ARCH"
+          exit 1
+        fi
+        
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${K8S_ARCH}/kubectl"
+        chmod +x kubectl
+        mv kubectl /usr/local/bin/
+        
+        JOB_NAME=$(cat /tmp/job-name)
+        
+        echo "=========================================="
+        echo "📦 Waiting for Kaniko Build Job"
+        echo "=========================================="
+        echo "Job Name: ${JOB_NAME}"
+        echo "Timeout: 1800 seconds (30 minutes)"
+        echo "=========================================="
+        echo ""
+        
+        # Pod가 생성될 때까지 대기 (최대 60초)
+        echo "⏳ Waiting for Pod to be created..."
+        POD_NAME=""
+        for i in $(seq 1 60); do
+          POD_NAME=$(kubectl get pods -n tekton-pipelines -l job-name=${JOB_NAME} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+          if [ -n "$POD_NAME" ]; then
+            echo "✓ Pod created: ${POD_NAME}"
+            break
+          fi
+          sleep 1
+        done
+        
+        if [ -z "$POD_NAME" ]; then
+          echo "✗ Pod creation timeout"
+          exit 1
+        fi
+        
+        # Pod가 Running 상태가 될 때까지 대기 (최대 120초)
+        echo ""
+        echo "⏳ Waiting for Pod to start running..."
+        for i in $(seq 1 120); do
+          POD_STATUS=$(kubectl get pod ${POD_NAME} -n tekton-pipelines -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+          if [ "$POD_STATUS" = "Running" ] || [ "$POD_STATUS" = "Succeeded" ]; then
+            echo "✓ Pod is ${POD_STATUS}"
+            break
+          fi
+          
+          # Pod 상태 출력
+          if [ $((i % 10)) -eq 0 ]; then
+            echo "  Pod status: ${POD_STATUS} (${i}s)"
+          fi
+          sleep 1
+        done
+        
+        echo ""
+        echo "=========================================="
+        echo "📋 Streaming Kaniko Build Logs"
+        echo "=========================================="
+        echo ""
+        
+        # 로그 스트리밍을 백그라운드에서 실행
+        kubectl logs -f ${POD_NAME} -n tekton-pipelines -c kaniko-build 2>/dev/null &
+        LOG_PID=$!
+        
+        # Job 상태 모니터링
+        TIMEOUT=1800
+        ELAPSED=0
+        INTERVAL=5
+        
+        while [ $ELAPSED -lt $TIMEOUT ]; do
+          # Job 상태 확인
+          STATUS=$(kubectl get job ${JOB_NAME} -n tekton-pipelines -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}' 2>/dev/null || echo "")
+          FAILED=$(kubectl get job ${JOB_NAME} -n tekton-pipelines -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' 2>/dev/null || echo "")
+          
+          if [ "$STATUS" = "True" ]; then
+            # 로그 프로세스가 끝날 때까지 잠시 대기
+            sleep 2
+            kill $LOG_PID 2>/dev/null || true
+            
+            echo ""
+            echo "=========================================="
+            echo "✅ Build Completed Successfully!"
+            echo "=========================================="
+            echo "Image: $(params.container-registry-url)/$(params.module-name):$(params.git-short-sha)-$(params.timestamp)"
+            echo "=========================================="
+            
+            echo "$(params.container-registry-url)/$(params.module-name):$(params.git-short-sha)-$(params.timestamp)" > $(results.image-url.path)
+            exit 0
+          fi
+          
+          if [ "$FAILED" = "True" ]; then
+            kill $LOG_PID 2>/dev/null || true
+            
+            echo ""
+            echo "=========================================="
+            echo "❌ Build Failed"
+            echo "=========================================="
+            echo ""
+            echo "=== Last 200 lines of logs ==="
+            kubectl logs ${POD_NAME} -n tekton-pipelines -c kaniko-build --tail=200 2>/dev/null || true
+            echo ""
+            echo "=== Pod Status ==="
+            kubectl describe pod ${POD_NAME} -n tekton-pipelines | tail -50
+            exit 1
+          fi
+          
+          sleep $INTERVAL
+          ELAPSED=$((ELAPSED + INTERVAL))
+        done
+        
+        # Timeout
+        kill $LOG_PID 2>/dev/null || true
+        
+        echo ""
+        echo "=========================================="
+        echo "⏱️  Build Timeout (30 minutes)"
+        echo "=========================================="
+        echo ""
+        echo "=== Last 200 lines of logs ==="
+        kubectl logs ${POD_NAME} -n tekton-pipelines -c kaniko-build --tail=200 2>/dev/null || true
+        exit 1
+      volumeMounts:
+        - name: job-info
+          mountPath: /tmp
+  
+  volumes:
+    - name: job-info
+      emptyDir: {}
