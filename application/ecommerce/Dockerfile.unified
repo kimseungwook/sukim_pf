@@ -4,7 +4,7 @@
 #
 # Usage: docker build --build-arg MODULE_NAME=goyoai-gointern-portal \
 #                      --build-arg BASE_IMAGE=openjdk:17-jdk-oraclelinux8 \
-#                      -f Dockerfile.unified . 
+#                      -f Dockerfile.unified .
 
 ARG BASE_IMAGE=gdhb.goyoai.com/common/openjdk:17-jdk-oraclelinux8-otel-2.21.0
 
