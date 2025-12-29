@@ -268,8 +268,9 @@ spec:
                   echo "Module: $(params.module-name)"
                   echo ""
                   
-                  RELATIVE_DOCKERFILE=\$(echo "\${DOCKERFILE_PATH}" | sed 's|^/workspace/||' | sed 's|^|./|')
-                  echo "Relative Dockerfile path: \${RELATIVE_DOCKERFILE}"
+                  # Context 디렉토리 기준 상대 경로 (Dockerfile이 context 안에 있음)
+                  RELATIVE_DOCKERFILE=\"./Dockerfile.frontend\"
+                  echo \"Relative Dockerfile path: \\${RELATIVE_DOCKERFILE}\"
                   echo ""
                   
                   cd \${CONTEXT_DIR}
