@@ -1,6 +1,6 @@
 apiVersion: v2
-name: goyoai-backend-system
-description: A Helm chart for Goyoai Web Back v2
+name: ecommerce-backend
+description: A Helm chart for Ecommerce Backend Application
 type: application
-version: 0.1.3
-appVersion: 1.16.0
+version: 0.1.0
+appVersion: 1.0.0

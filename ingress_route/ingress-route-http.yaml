@@ -125,3 +125,13 @@ spec:
           name: vault-ui
           namespace: vault
           port: 8200
+
+    - kind: Rule
+      match: Host(`ebevtrg.8ai.store`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: el-ecommerce-backend
+          namespace: tekton-pipelines
+          port: 8080

@@ -208,6 +208,14 @@ spec:
           namespace: vault
           port: 8200
     
+    - kind: Rule
+      match: Host(`ebevtrg.8ai.store`)
+      priority: 10
+      services:
+        - name: el-ecommerce-backend
+          namespace: tekton-pipelines
+          port: 8080
+    
   tls:
     secretName: godaddy-tls
   # Include TLS configuration if Traefik is handling TLS2
