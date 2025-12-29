@@ -37,10 +37,8 @@ spec:
 
     - name: dockerfile-name
       value: $(extensions.dockerfile_name)
-    - name: gradle-workers
-      value: $(extensions.gradle_workers)
-    - name: gradle-memory
-      value: $(extensions.gradle_memory)
+    - name: go-context-dir
+      value: $(extensions.go_context_dir)
 
     - name: commit-message
       # 커밋 메시지

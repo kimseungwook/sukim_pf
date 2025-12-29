@@ -16,10 +16,8 @@ spec:
     - name: commit-message
     - name: author-name
     - name: author-email
-    - name: gradle-workers
-      default: "12"
-    - name: gradle-memory
-      default: "10g"
+    - name: go-context-dir
+      default: "{{ .Values.go_context_dir }}"
 
   resourcetemplates:
     - apiVersion: tekton.dev/v1beta1
@@ -29,8 +27,8 @@ spec:
         namespace: tekton-pipelines
         labels:
           # 기본 라벨
-          app: goyoai-gointern-system
-          tekton.dev/pipeline: goyoai-gointern-system
+          app: ecommerce-backend
+          tekton.dev/pipeline: ecommerce-backend
           # Git 정보
           git.branch: "$(tt.params.gitrevision)"
           git.commit: "$(tt.params.git-short-sha)"
@@ -75,10 +73,8 @@ spec:
             value: "$(tt.params.module-name)"
           - name: dockerfile-name
             value: "$(tt.params.dockerfile-name)"
-          - name: gradle-workers
-            value: "$(tt.params.gradle-workers)"
-          - name: gradle-memory
-            value: "$(tt.params.gradle-memory)"
+          - name: go-context-dir
+            value: "$(tt.params.go-context-dir)"
           - name: author-name
             value: "$(tt.params.author-name)"
           - name: commit-message

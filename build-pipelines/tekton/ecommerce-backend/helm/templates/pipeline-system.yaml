@@ -29,12 +29,10 @@ spec:
     - name: dockerfile-name
       type: string
       description: "Name of the Dockerfile to use"
-    - name: gradle-workers
+    - name: go-context-dir
       type: string
-      default: "12"
-    - name: gradle-memory
-      type: string
-      default: "10g"
+      default: "{{ .Values.go_context_dir }}"
+      description: "Go 프로젝트의 context 디렉토리 (go.mod가 있는 위치)"
     - name: author-name
       type: string
       description: "Git commit author name"
@@ -99,10 +97,8 @@ spec:
           value: $(params.giturl)
         - name: revision
           value: $(params.revision)
-        - name: gradle-workers
-          value: $(params.gradle-workers)
-        - name: gradle-memory
-          value: $(params.gradle-memory)
+        - name: go-context-dir
+          value: $(params.go-context-dir)
       runAfter: ["clone-repository"]
       workspaces:
         - name: {{ .Values.project_name }}

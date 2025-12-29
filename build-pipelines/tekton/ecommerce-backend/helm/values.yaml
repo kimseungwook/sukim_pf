@@ -43,8 +43,10 @@ project_name: "ecommerce-backend"
 # Task 이름
 system_build_task_name: "ecommerce-backend-image-build"
 
-#dockerfile 
-docker_backend: "application/ecommerce-react/backend/Dockerfile.backend"
+# Go Backend 빌드 설정
+docker_backend: "application/ecommerce/backend/Dockerfile.backend"
+# Go 프로젝트의 context 디렉토리 (go.mod가 있는 위치)
+go_context_dir: "application/ecommerce/backend"
 
 # Slack
 slack_webhook_url: "https://hooks.slack.com/services/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"

@@ -63,6 +63,8 @@ spec:
                   expression: "'ecommerce-backend'"
                 - key: dockerfile_name
                   expression: "'{{ .Values.docker_backend }}'"
+                - key: go_context_dir
+                  expression: "'{{ .Values.go_context_dir }}'"
                 - key: commit_message
                   expression: "body.head_commit.message"
                 - key: author_name
