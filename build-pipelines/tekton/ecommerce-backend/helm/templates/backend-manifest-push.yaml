@@ -33,7 +33,7 @@ spec:
     - name: {{ .Values.project_name }}
   steps:
     - name: clean-and-setup-workspace
-      image: gdhb.goyoai.com/common/git:2.45.2
+      image: {{ .Values.common_alpine_git_url }}
       script: |
         #!/bin/sh
         set -e
@@ -83,7 +83,7 @@ spec:
               serviceAccountName: goyoai-vault-sa
               containers:
                 - name: ${DEPLOYMENT_NAME}-container
-                  image: $(params.container-registry-url)/${MODULE_NAME}:$(params.git-short-sha)-$(params.timestamp)
+                  image: $(params.container-registry-url):$(params.git-short-sha)-$(params.timestamp)
         EOF
         
         echo ""
@@ -159,7 +159,7 @@ spec:
               "type": "section",
               "text": {
                 "type": "mrkdwn",
-                "text": "*Registry:* \`gdhb.goyoai.com/goyoai-web\`\n*Deployment:* Ready for ArgoCD sync"
+                "text": "*Registry:* \`harbor.8ai.store/ecommerce-backend\`\n*Deployment:* Ready for ArgoCD sync"
               }
             },
             {
