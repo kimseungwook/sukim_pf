@@ -68,11 +68,11 @@ spec:
 
         if [ "$GIT_BRANCH" = "main" ] || [ "$GIT_BRANCH" = "master" ]; then
           # main/master 브랜치는 dev 경로 사용
-          KUSTOMIZE_DIR="overlays/dev/${MODULE_NAME}"
+          KUSTOMIZE_DIR="goyoai-gitops/k8s-configs/overlays/dev/${MODULE_NAME}"
           DEPLOYMENT_NAME="${MODULE_NAME}"
         elif [ "$GIT_BRANCH" = "dev" ]; then
           # dev 브랜치는 dev 경로 사용
-          KUSTOMIZE_DIR="overlays/dev/${MODULE_NAME}"
+          KUSTOMIZE_DIR="goyoai-gitops/k8s-configs/overlays/dev/${MODULE_NAME}"
           DEPLOYMENT_NAME="${MODULE_NAME}"
         else
           # 그 외 브랜치(feature 등)는 별도 경로 사용
