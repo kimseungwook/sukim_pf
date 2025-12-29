@@ -216,7 +216,7 @@ spec:
                   echo ""
                   
                   echo "=== Kaniko Build Configuration ==="
-                  IMAGE_TAG="$(params.container-registry-url):$(params.git-short-sha)-$(params.timestamp)"
+                  IMAGE_TAG="$(params.container-registry-url)/$(params.module-name):$(params.git-short-sha)-$(params.timestamp)"
                   
                   # Dockerfile이 context 디렉토리 안에 있는지 확인
                   # Dockerfile.backend가 context 디렉토리 안에 있으면 상대 경로 사용
@@ -397,9 +397,9 @@ spec:
             echo "=========================================="
             echo "✅ Go Backend Build Completed Successfully!"
             echo "=========================================="
-            echo "Image: $(params.container-registry-url):$(params.git-short-sha)-$(params.timestamp)"
+            echo "Image: $(params.container-registry-url)/$(params.module-name):$(params.git-short-sha)-$(params.timestamp)"
             echo "=========================================="
-            echo "$(params.container-registry-url):$(params.git-short-sha)-$(params.timestamp)" > $(results.image-url.path)
+            echo "$(params.container-registry-url)/$(params.module-name):$(params.git-short-sha)-$(params.timestamp)" > $(results.image-url.path)
             exit 0
           fi
           
