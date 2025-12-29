@@ -45,7 +45,7 @@ spec:
                 body.ref.split('/')[2] in [{{ range $index, $revision := .Values.gitRevisions }}{{ if $index }},{{ end }}'{{ $revision }}'{{ end }}] &&
                 !body.head_commit.message.contains('[skip-ci]') &&
                 (
-                  body.head_commit.message.contains('[bd:frontend]') ||
+                  body.head_commit.message.contains('[bd:fe]') ||
                   body.head_commit.message.contains('[bd:ecommerce]') ||
                   body.head_commit.message.contains('[bd:all]') ||
                   body.commits.exists(c, c.added.exists(f, f.startsWith('application/ecommerce/frontend/'))) ||
