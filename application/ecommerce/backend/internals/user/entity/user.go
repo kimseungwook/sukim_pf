@@ -13,7 +13,7 @@ type User struct {
 	ID        string          `json:"id" gorm:"unique;not null;index;primary_key"`
 	Email     string          `json:"email" gorm:"uniqueIndex:unique_user_email;not null"`
 	Name      string          `json:"name" gorm:"uniqueIndex:unique_user_name;not null"`
-	AvatarUrl string          `json:"avatar_url" gorm:"unique:unique_user_avatar;not null"`
+	AvatarUrl string          `json:"avatar_url" gorm:"default:null"`
 	Password  string          `json:"password" gorm:"not null;"`
 	Role      string          `json:"role" gorm:"default:'customer';not null"`
 	CreatedAt time.Time       `json:"created_at" gorm:"autoCreateTime"`
