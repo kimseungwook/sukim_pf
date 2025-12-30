@@ -86,7 +86,7 @@ COPY --from=builder /bin/app /app/app
 RUN chmod +x /app/app
 
 # 설정 파일 및 정책 파일 복사
-COPY --from=builder /app/policy /app/policy
+COPY --from=builder /app/policy /policy
 COPY --from=builder /app/configs /app/configs
 
 # Entrypoint 스크립트 복사 (있는 경우)
