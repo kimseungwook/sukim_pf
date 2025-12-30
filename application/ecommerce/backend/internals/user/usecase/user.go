@@ -87,7 +87,8 @@ func (u *UserUseCase) SignUp(ctx context.Context, req *dto.SignUpRequest) (strin
 	}
 
 	var avatarUrlUpload = ""
-	if req.Avatar != nil {
+	// Avatar 파일이 있고, 파일명이 비어있지 않은 경우에만 업로드
+	if req.Avatar != nil && req.Avatar.Filename != "" {
 		avatarURL, err := u.minioClient.UploadFile(ctx, req.Avatar, "users")
 		if err != nil {
 			logger.Errorf("Failed to upload avatar: %s", err)
