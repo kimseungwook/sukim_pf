@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: vault-sa
-  namespace: sukim-web
+  name: ecommerce-vault-sa
+  namespace: ecommerce
   labels:
     app: vault
     purpose: vault-authentication

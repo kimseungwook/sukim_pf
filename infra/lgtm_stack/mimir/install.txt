@@ -1,2 +1,113 @@
+# =============================================================================
+# Mimir Installation Guide - Grafana Helm Chart (Distributed Mode)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 개요
+# -----------------------------------------------------------------------------
+# - 분산 모드로 설치 (Prometheus 호환 장기 메트릭 저장소)
+# - OCI Object Storage (S3 호환)를 백엔드로 사용
+# - kube-prometheus-stack과 함께 사용하여 메트릭 수집
+# - Prometheus remote_write 방식으로 데이터 전송
+
+# -----------------------------------------------------------------------------
+# Step 1: Helm Repo 추가
+# -----------------------------------------------------------------------------
 helm repo add grafana https://grafana.github.io/helm-charts
-helm upgrade --install mimir grafana/mimir-distributed --version 6.1.0-weekly.373 -f lgtm_stack/mimir/values.yaml -n monitoring
+helm repo update
+
+# -----------------------------------------------------------------------------
+# Step 2: Mimir 설치
+# -----------------------------------------------------------------------------
+helm upgrade --install mimir grafana/mimir-distributed \
+  --version 6.1.0-weekly.373 \
+  -f infra/lgtm_stack/mimir/values.yaml \
+  -n monitoring \
+  --create-namespace
+
+# -----------------------------------------------------------------------------
+# Step 3: 설치 확인
+# -----------------------------------------------------------------------------
+kubectl get pods -n monitoring -l app.kubernetes.io/name=mimir
+kubectl get svc -n monitoring -l app.kubernetes.io/name=mimir
+
+# 컴포넌트별 확인
+kubectl get pods -n monitoring -l app.kubernetes.io/component=distributor
+kubectl get pods -n monitoring -l app.kubernetes.io/component=ingester
+kubectl get pods -n monitoring -l app.kubernetes.io/component=querier
+kubectl get pods -n monitoring -l app.kubernetes.io/component=compactor
+
+# Pod 로그 확인
+kubectl logs -n monitoring -l app.kubernetes.io/name=mimir -f
+
+# Gateway 상태 확인
+kubectl get pods -n monitoring -l app.kubernetes.io/component=gateway
+
+# -----------------------------------------------------------------------------
+# Step 4: Mimir 상태 확인
+# -----------------------------------------------------------------------------
+# Mimir Gateway를 통한 상태 확인
+kubectl port-forward -n monitoring svc/mimir-gateway 8080:80
+
+# 브라우저 또는 curl로 확인:
+# curl http://localhost:8080/ready
+# curl http://localhost:8080/api/v1/status/buildinfo
+
+# -----------------------------------------------------------------------------
+# 업그레이드
+# -----------------------------------------------------------------------------
+helm upgrade mimir grafana/mimir-distributed \
+  --version 6.1.0-weekly.373 \
+  -f infra/lgtm_stack/mimir/values.yaml \
+  -n monitoring
+
+# 릴리즈 히스토리 확인
+helm history mimir -n monitoring
+
+# 이전 버전으로 롤백 (필요시)
+# helm rollback mimir [REVISION] -n monitoring
+
+# -----------------------------------------------------------------------------
+# 삭제
+# -----------------------------------------------------------------------------
+# WARNING: 모든 데이터가 삭제됩니다!
+helm uninstall mimir -n monitoring
+
+# PVC 삭제 (필요시)
+kubectl delete pvc -n monitoring -l app.kubernetes.io/name=mimir
+
+# -----------------------------------------------------------------------------
+# 트러블슈팅
+# -----------------------------------------------------------------------------
+# 1. Pod가 시작되지 않는 경우
+kubectl describe pod -n monitoring -l app.kubernetes.io/name=mimir
+kubectl logs -n monitoring -l app.kubernetes.io/name=mimir --previous
+
+# 2. S3/OCI Object Storage 연결 확인
+kubectl logs -n monitoring -l app.kubernetes.io/component=compactor | grep -i "s3\|error\|bucket"
+
+# 3. Ingester 상태 확인 (메트릭 수집 관련)
+kubectl logs -n monitoring -l app.kubernetes.io/component=ingester | grep -i "error\|warn"
+
+# 4. 메모리/CPU 리소스 확인
+kubectl top pods -n monitoring -l app.kubernetes.io/name=mimir
+
+# 5. Helm 차트 값 확인
+helm get values mimir -n monitoring
+helm get manifest mimir -n monitoring
+
+# -----------------------------------------------------------------------------
+# Prometheus remote_write 설정
+# -----------------------------------------------------------------------------
+# kube-prometheus-stack의 values.yaml에 추가:
+# prometheus:
+#   prometheusSpec:
+#     remoteWrite:
+#       - url: http://mimir-gateway.monitoring.svc.cluster.local:80/api/v1/push
+
+# -----------------------------------------------------------------------------
+# Grafana에서 데이터소스 추가
+# -----------------------------------------------------------------------------
+# Type: Prometheus
+# URL: http://mimir-gateway.monitoring.svc.cluster.local:80/prometheus
+# (Grafana가 같은 클러스터에 있는 경우)

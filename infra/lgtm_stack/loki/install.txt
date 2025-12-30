@@ -1,3 +1,115 @@
+# =============================================================================
+# Loki Installation Guide - Grafana Helm Chart (SimpleScalable Mode)
+# =============================================================================
 
+# -----------------------------------------------------------------------------
+# 개요
+# -----------------------------------------------------------------------------
+# - SimpleScalable 모드로 설치 (write, read, backend 분리)
+# - OCI Object Storage (S3 호환)를 백엔드로 사용
+# - 90일 로그 보관 (retention_enabled: true)
+# - Promtail과 함께 사용하여 로그 수집
+
+# -----------------------------------------------------------------------------
+# Step 1: Helm Repo 추가
+# -----------------------------------------------------------------------------
 helm repo add grafana https://grafana.github.io/helm-charts
-helm upgrade --install loki grafana/loki --version 6.49.0 -f lgtm/loki_stack/values.yaml -n monitoring
+helm repo update
+
+# -----------------------------------------------------------------------------
+# Step 2: Loki 설치
+# -----------------------------------------------------------------------------
+helm upgrade --install loki grafana/loki \
+  --version 6.49.0 \
+  -f infra/lgtm_stack/loki/values.yaml \
+  -n monitoring \
+  --create-namespace
+
+# -----------------------------------------------------------------------------
+# Step 3: 설치 확인
+# -----------------------------------------------------------------------------
+kubectl get pods -n monitoring -l app.kubernetes.io/name=loki
+kubectl get svc -n monitoring -l app.kubernetes.io/name=loki
+
+# 컴포넌트별 확인
+kubectl get pods -n monitoring -l app.kubernetes.io/component=write
+kubectl get pods -n monitoring -l app.kubernetes.io/component=read
+kubectl get pods -n monitoring -l app.kubernetes.io/component=backend
+
+# Pod 로그 확인
+kubectl logs -n monitoring -l app.kubernetes.io/name=loki -f
+
+# Gateway 상태 확인
+kubectl get pods -n monitoring -l app.kubernetes.io/component=gateway
+
+# -----------------------------------------------------------------------------
+# Step 4: Loki 상태 확인
+# -----------------------------------------------------------------------------
+# Loki Gateway를 통한 상태 확인
+kubectl port-forward -n monitoring svc/loki-gateway 3100:80
+
+# 브라우저 또는 curl로 확인:
+# curl http://localhost:3100/ready
+# curl http://localhost:3100/metrics
+
+# -----------------------------------------------------------------------------
+# 업그레이드
+# -----------------------------------------------------------------------------
+helm upgrade loki grafana/loki \
+  --version 6.49.0 \
+  -f infra/lgtm_stack/loki/values.yaml \
+  -n monitoring
+
+# 릴리즈 히스토리 확인
+helm history loki -n monitoring
+
+# 이전 버전으로 롤백 (필요시)
+# helm rollback loki [REVISION] -n monitoring
+
+# -----------------------------------------------------------------------------
+# 삭제
+# -----------------------------------------------------------------------------
+# WARNING: 모든 데이터가 삭제됩니다!
+helm uninstall loki -n monitoring
+
+# PVC 삭제 (필요시)
+kubectl delete pvc -n monitoring -l app.kubernetes.io/name=loki
+
+# -----------------------------------------------------------------------------
+# 트러블슈팅
+# -----------------------------------------------------------------------------
+# 1. Pod가 시작되지 않는 경우
+kubectl describe pod -n monitoring -l app.kubernetes.io/name=loki
+kubectl logs -n monitoring -l app.kubernetes.io/name=loki --previous
+
+# 2. S3/OCI Object Storage 연결 확인
+kubectl logs -n monitoring -l app.kubernetes.io/component=backend | grep -i "s3\|error\|bucket"
+
+# 3. Compactor 상태 확인 (retention 관련)
+kubectl logs -n monitoring -l app.kubernetes.io/component=backend | grep -i "compactor\|retention"
+
+# 4. 메모리/CPU 리소스 확인
+kubectl top pods -n monitoring -l app.kubernetes.io/name=loki
+
+# 5. Helm 차트 값 확인
+helm get values loki -n monitoring
+helm get manifest loki -n monitoring
+
+# -----------------------------------------------------------------------------
+# 유용한 명령어
+# -----------------------------------------------------------------------------
+# Loki 설정 확인
+kubectl exec -it -n monitoring <loki-pod-name> -- cat /etc/loki/config/config.yaml
+
+# LogQL 쿼리 테스트 (Grafana Explore에서 권장)
+# {namespace="ecommerce"} |= "error"
+# {namespace="ecommerce", container="ecommerce-backend"} | json
+
+# Loki 버전 확인
+kubectl exec -it -n monitoring <loki-pod-name> -- loki -version
+
+# -----------------------------------------------------------------------------
+# Grafana에서 데이터소스 추가
+# -----------------------------------------------------------------------------
+# URL: http://loki-gateway.monitoring.svc.cluster.local:80
+# (Grafana가 같은 클러스터에 있는 경우)

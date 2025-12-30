@@ -1,2 +1,123 @@
+# =============================================================================
+# Tempo Installation Guide - Grafana Helm Chart (Distributed Mode)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 개요
+# -----------------------------------------------------------------------------
+# - 분산 모드로 설치 (분산 트레이싱 백엔드)
+# - OCI Object Storage (S3 호환)를 백엔드로 사용
+# - OpenTelemetry Collector와 함께 사용하여 트레이스 수집
+# - OTLP, Jaeger, Zipkin 프로토콜 지원
+
+# -----------------------------------------------------------------------------
+# Step 1: Helm Repo 추가
+# -----------------------------------------------------------------------------
 helm repo add grafana https://grafana.github.io/helm-charts
-helm upgrade --install tempo-distributed grafana/tempo-distributed --version 1.60.0 -f lgtm_stack/tempo/values.yaml -n monitoring
+helm repo update
+
+# -----------------------------------------------------------------------------
+# Step 2: Tempo 설치
+# -----------------------------------------------------------------------------
+helm upgrade --install tempo-distributed grafana/tempo-distributed \
+  --version 1.60.0 \
+  -f infra/lgtm_stack/tempo/values.yaml \
+  -n monitoring \
+  --create-namespace
+
+# -----------------------------------------------------------------------------
+# Step 3: 설치 확인
+# -----------------------------------------------------------------------------
+kubectl get pods -n monitoring -l app.kubernetes.io/name=tempo
+kubectl get svc -n monitoring -l app.kubernetes.io/name=tempo
+
+# 컴포넌트별 확인
+kubectl get pods -n monitoring -l app.kubernetes.io/component=distributor
+kubectl get pods -n monitoring -l app.kubernetes.io/component=ingester
+kubectl get pods -n monitoring -l app.kubernetes.io/component=querier
+kubectl get pods -n monitoring -l app.kubernetes.io/component=compactor
+
+# Pod 로그 확인
+kubectl logs -n monitoring -l app.kubernetes.io/name=tempo -f
+
+# Gateway 상태 확인
+kubectl get pods -n monitoring -l app.kubernetes.io/component=gateway
+
+# -----------------------------------------------------------------------------
+# Step 4: Tempo 상태 확인
+# -----------------------------------------------------------------------------
+# Tempo Gateway를 통한 상태 확인
+kubectl port-forward -n monitoring svc/tempo-distributed-gateway 3200:80
+
+# 브라우저 또는 curl로 확인:
+# curl http://localhost:3200/ready
+# curl http://localhost:3200/status
+
+# -----------------------------------------------------------------------------
+# Step 5: 트레이스 수신 엔드포인트
+# -----------------------------------------------------------------------------
+# Distributor 서비스의 포트:
+# - OTLP gRPC: 4317
+# - OTLP HTTP: 4318
+# - Jaeger gRPC: 14250
+# - Jaeger Thrift HTTP: 14268
+# - Zipkin: 9411
+
+# 예시 (클러스터 내부):
+# OTLP: tempo-distributed-distributor.monitoring.svc.cluster.local:4317
+
+# -----------------------------------------------------------------------------
+# 업그레이드
+# -----------------------------------------------------------------------------
+helm upgrade tempo-distributed grafana/tempo-distributed \
+  --version 1.60.0 \
+  -f infra/lgtm_stack/tempo/values.yaml \
+  -n monitoring
+
+# 릴리즈 히스토리 확인
+helm history tempo-distributed -n monitoring
+
+# 이전 버전으로 롤백 (필요시)
+# helm rollback tempo-distributed [REVISION] -n monitoring
+
+# -----------------------------------------------------------------------------
+# 삭제
+# -----------------------------------------------------------------------------
+# WARNING: 모든 데이터가 삭제됩니다!
+helm uninstall tempo-distributed -n monitoring
+
+# PVC 삭제 (필요시)
+kubectl delete pvc -n monitoring -l app.kubernetes.io/name=tempo
+
+# -----------------------------------------------------------------------------
+# 트러블슈팅
+# -----------------------------------------------------------------------------
+# 1. Pod가 시작되지 않는 경우
+kubectl describe pod -n monitoring -l app.kubernetes.io/name=tempo
+kubectl logs -n monitoring -l app.kubernetes.io/name=tempo --previous
+
+# 2. S3/OCI Object Storage 연결 확인
+kubectl logs -n monitoring -l app.kubernetes.io/component=compactor | grep -i "s3\|error\|bucket"
+
+# 3. Ingester 상태 확인 (트레이스 수집 관련)
+kubectl logs -n monitoring -l app.kubernetes.io/component=ingester | grep -i "error\|warn"
+
+# 4. 메모리/CPU 리소스 확인
+kubectl top pods -n monitoring -l app.kubernetes.io/name=tempo
+
+# 5. Helm 차트 값 확인
+helm get values tempo-distributed -n monitoring
+helm get manifest tempo-distributed -n monitoring
+
+# -----------------------------------------------------------------------------
+# 애플리케이션 설정 (OpenTelemetry)
+# -----------------------------------------------------------------------------
+# OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo-distributed-distributor.monitoring.svc.cluster.local:4317
+# OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+
+# -----------------------------------------------------------------------------
+# Grafana에서 데이터소스 추가
+# -----------------------------------------------------------------------------
+# Type: Tempo
+# URL: http://tempo-distributed-gateway.monitoring.svc.cluster.local:80
+# (Grafana가 같은 클러스터에 있는 경우)
