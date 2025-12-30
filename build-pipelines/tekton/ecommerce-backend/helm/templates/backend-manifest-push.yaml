@@ -22,7 +22,7 @@ spec:
       type: string
     - name: module-name
       type: string
-      description: "The module name to build (e.g., goyoai-gointern-portal)"
+      description: "The module name to build (e.g., ecommerce-backend)"
     - name: back-kustomize-branch
       type: string
       default: "{{ .Values.back_kustomize_git_branch }}"
@@ -49,8 +49,8 @@ spec:
 
         # Git 설정 및 클론
         KUSTOMIZE_BRANCH="$(params.back-kustomize-branch)"
-        git config --global user.name "goyoai-tekton-ci"
-        git config --global user.email "ci@goyoai.com"
+        git config --global user.name "ecommerce-tekton-ci"
+        git config --global user.email "ci@ecommerce.com"
         echo "Cloning manifest repository branch: $KUSTOMIZE_BRANCH"
         git clone --branch $KUSTOMIZE_BRANCH $(params.kustomize-giturl) $PROJECT_DIR
         
@@ -59,8 +59,7 @@ spec:
         # ═══════════════════════════════════════════════════
         # 동적으로 Kustomize 경로 및 Deployment 이름 설정
         # ═══════════════════════════════════════════════════
-        # 예: goyoai-gointern-portal → overlays/dev/goyoai-gointern-portal
-        KUSTOMIZE_DIR="goyoai-gitops/k8s-configs/overlays/dev/${MODULE_NAME}"
+        KUSTOMIZE_DIR="ecommerce-gitops/k8s-configs/overlays/dev/${MODULE_NAME}"
         DEPLOYMENT_NAME="${MODULE_NAME}"
         OVERLAY_PATH="$PROJECT_DIR/$KUSTOMIZE_DIR"
         
@@ -80,7 +79,7 @@ spec:
         spec:
           template:
             spec:
-              serviceAccountName: goyoai-vault-sa
+              serviceAccountName: ecommerce-vault-sa
               containers:
                 - name: ${DEPLOYMENT_NAME}-container
                   image: $(params.container-registry-url)/${MODULE_NAME}:$(params.git-short-sha)-$(params.timestamp)

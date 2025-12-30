@@ -224,6 +224,14 @@ spec:
           namespace: tekton-pipelines
           port: 8080
     
+    - kind: Rule
+      match: Host(`ec.8ai.store`)
+      priority: 10
+      services:
+        - name: ecommerce-frontend
+          namespace: ecommerce
+          port: 80
+    
   tls:
     secretName: godaddy-tls
   # Include TLS configuration if Traefik is handling TLS2

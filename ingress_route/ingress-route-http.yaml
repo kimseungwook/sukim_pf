@@ -145,3 +145,13 @@ spec:
           name: el-ecommerce-frontend
           namespace: tekton-pipelines
           port: 8080
+
+    - kind: Rule
+      match: Host(`ec.8ai.store`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: ecommerce-frontend
+          namespace: ecommerce
+          port: 80
