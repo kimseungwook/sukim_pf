@@ -202,8 +202,8 @@ spec:
                   # 🔥 NEW: .env 파일을 앱 디렉토리로 복사
                   # ==========================================
                   if [ -n "\${ENV_FILE}" ] && [ -f "\${ENV_FILE}" ]; then
-                    # 앱 디렉토리는 전체 모듈명 사용 (goyoai-xxx-web)
-                    APP_DIR="/workspace/apps/\${MODULE_NAME}"
+                    # ecommerce 프로젝트 구조에 맞는 경로
+                    APP_DIR="/workspace/{{ .Values.frontend_context_dir }}"
                     
                     if [ -d "\${APP_DIR}" ]; then
                       cp "\${ENV_FILE}" "\${APP_DIR}/.env.production.local"
@@ -211,8 +211,8 @@ spec:
                       echo ""
                     else
                       echo "⚠️  App directory not found: \${APP_DIR}"
-                      echo "⚠️  Available apps:"
-                      ls -d /workspace/apps/*/ 2>/dev/null || echo "  No apps found"
+                      echo "⚠️  Available directories:"
+                      ls -la /workspace/ 2>/dev/null || echo "  Cannot list workspace"
                     fi
                   fi
                   
@@ -280,9 +280,9 @@ spec:
                   echo "Relative Path: \${RELATIVE_DOCKERFILE}"
                   
                   # 🔥 .env 파일 최종 확인
-                  if [ -f "/workspace/apps/\${MODULE_NAME}/.env.production.local" ]; then
+                  if [ -f "/workspace/{{ .Values.frontend_context_dir }}/.env.production.local" ]; then
                     echo "✓ .env.production.local present in app directory"
-                    echo "  Variables: \$(wc -l < /workspace/apps/\${MODULE_NAME}/.env.production.local)"
+                    echo "  Variables: \$(wc -l < /workspace/{{ .Values.frontend_context_dir }}/.env.production.local)"
                   else
                     echo "⚠️  .env.production.local not found in app directory"
                   fi
