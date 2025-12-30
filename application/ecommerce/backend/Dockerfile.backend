@@ -89,7 +89,7 @@ RUN chmod +x /app/app
 COPY --from=builder /app/policy /policy
 COPY --from=builder /app/configs /app/configs
 
-# Entrypoint 스크립트 복사 (있는 경우)
+# Entrypoint 스크립트 복사 (있는 경우) 
 COPY --from=builder /app/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
