@@ -11,5 +11,5 @@ until curl -s http://${MINIO_ENDPOINT}/minio/health/live; do
 done
 
 echo "MinIO is ready! Starting application..."
-exec "/app"
+exec "/app/app"
 
