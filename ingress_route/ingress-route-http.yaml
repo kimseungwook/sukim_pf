@@ -155,3 +155,13 @@ spec:
           name: ecommerce-frontend
           namespace: ecommerce
           port: 80
+
+    - kind: Rule
+      match: Host(`ec-api.8ai.store`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: ecommerce-backend
+          namespace: ecommerce
+          port: 8080

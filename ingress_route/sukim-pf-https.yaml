@@ -232,6 +232,14 @@ spec:
           namespace: ecommerce
           port: 80
     
+    - kind: Rule
+      match: Host(`ec-api.8ai.store`)
+      priority: 10
+      services:
+        - name: ecommerce-backend
+          namespace: ecommerce
+          port: 8080
+    
   tls:
     secretName: godaddy-tls
   # Include TLS configuration if Traefik is handling TLS2
