@@ -107,8 +107,9 @@ func (u *UserUseCase) SignUp(ctx context.Context, req *dto.SignUpRequest) (strin
 		return "", "", nil, err
 	}
 
+	// 이메일 발송 실패해도 회원가입은 완료되도록 처리
 	if err := u.mailer.Send(user.Email, "Hello!", "<h1>Congratulations</h1><p>Your account has been successfully created</p>", true); err != nil {
-		logger.Fatalf("Send mail failure: %v", err)
+		logger.Warnf("Send mail failure (non-fatal): %v", err)
 	}
 
 	tokenData := token.AuthPayload{
