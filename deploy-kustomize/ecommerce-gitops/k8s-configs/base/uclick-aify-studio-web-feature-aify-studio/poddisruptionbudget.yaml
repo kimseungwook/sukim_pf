@@ -1,0 +1,9 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: uclick-aify-studio-web-feature-aify-studio-pdb
+spec:
+  maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: uclick-aify-studio-web-feature-aify-studio-app

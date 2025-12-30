@@ -1,0 +1,89 @@
+# ecommerce-frontend/base/deployment.yaml
+# Ecommerce React + Vite Frontend (Nginx 서빙)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ecommerce-frontend
+  labels:
+    app.kubernetes.io/component: ecommerce-frontend
+    app.kubernetes.io/instance: ecommerce-frontend
+    app.kubernetes.io/part-of: ecommerce
+spec:
+  progressDeadlineSeconds: 600
+  revisionHistoryLimit: 10
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ecommerce-frontend-app
+  template:
+    metadata:
+      labels:
+        app: ecommerce-frontend-app
+    spec:
+      imagePullSecrets:
+      - name: harbor-registry-secret
+      schedulerName: default-scheduler
+      dnsPolicy: ClusterFirst
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: "node-type"
+                operator: In
+                values:
+                - "virtual"
+      tolerations:
+      - key: "workload"
+        operator: "Equal"
+        value: "sukim-build"
+        effect: "NoSchedule"
+
+      containers:
+      - name: ecommerce-frontend-container
+        # 이미지는 overlay에서 패치됨
+        image: harbor.8ai.store/ecommerce/ecommerce-frontend:latest
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "250m"
+            memory: "256Mi"
+        startupProbe:
+          httpGet:
+            path: /
+            port: 80
+            scheme: HTTP
+          failureThreshold: 30
+          periodSeconds: 10
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /
+            port: 80
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 3
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /
+            port: 80
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 3
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File

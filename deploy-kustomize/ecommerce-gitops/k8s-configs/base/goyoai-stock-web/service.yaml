@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: goyoai-stock-web
+  labels:
+    app.kubernetes.io/component: goyoai-stock-web-generator
+    app.kubernetes.io/instance: goyoai-stock-web-generator
+    app.kubernetes.io/part-of: goyoai-stock-web-generator
+spec:
+  type: ClusterIP
+  selector:
+    app: goyoai-stock-web-app
+  ports:
+  - port: 5000
+    targetPort: 3000

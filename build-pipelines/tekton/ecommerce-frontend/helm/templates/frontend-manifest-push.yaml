@@ -98,7 +98,6 @@ spec:
         spec:
           template:
             spec:
-              serviceAccountName: ecommerce-frontend-sa
               containers:
                 - name: ${DEPLOYMENT_NAME}-container
                   image: $(params.container-registry-url)/${MODULE_NAME}:$(params.git-short-sha)-$(params.timestamp)

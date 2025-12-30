@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ecommerce-backend
+spec:
+  template:
+    spec:
+      # serviceAccountName: goyoai-vault-sa  # TODO: Vault 연동 시 활성화
+      containers:
+        - name: ecommerce-backend-container
+          image: harbor.8ai.store/ecommerce/ecommerce-backend:607851b-20251229142609
