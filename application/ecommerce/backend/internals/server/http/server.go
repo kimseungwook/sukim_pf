@@ -89,6 +89,11 @@ func (s Server) Run() error {
 		c.JSON(http.StatusOK, gin.H{"message": "Welcome to Ecommerce Clean Architecture"})
 	})
 
+	// Health check endpoint for Kubernetes probes
+	s.engine.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
 	//Start http server
 	logger.Info("HTTP server is listening on PORT: ", s.cfg.HttpPort)
 	if err := s.engine.Run(fmt.Sprintf(":%d", s.cfg.HttpPort)); err != nil {
