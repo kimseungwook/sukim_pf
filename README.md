@@ -25,6 +25,7 @@
     *   **Control Plane**: OCI Managed Kubernetes Service.
     *   **Node Pools**: 워크로드 특성에 따른 노드 풀 분리 (General Purpose, High Memory etc.).
     *   **Cluster Autoscaler**: 트래픽 증가에 따른 노드 자동 확장 구성.
+    *   **Cost Optimization**: **Managed Node**와 **Virtual Node**를 혼합 사용하여 관리 오버헤드를 줄이면서도 비용 효율적인 클러스터를 운영합니다. 상시 운영되는 워크로드는 Managed Node에, 일시적인 배치 작업이나 스파이크 트래픽 처리는 Virtual Node를 활용하여 비용을 최적화했습니다.
 
 ### 2.2 애플리케이션 아키텍처 (Microservices)
 이커머스 비즈니스 로직을 처리하기 위해 Frontend와 Backend가 분리되어 있습니다.
@@ -76,6 +77,7 @@ ArgoCD는 **App of Apps 패턴**을 사용하여 인프라 앱과 비즈니스 �
 ### 4.1 Secret Management (Vault + ESO)
 *   **문제**: Git 저장소에 API Key, DB Password 등 민감 정보가 평문으로 노출되는 위험.
 *   **해결**: HashiCorp Vault에 암호화하여 저장하고, **External Secrets Operator (ESO)** 를 통해 파드(Pod) 실행 시점에만 메모리 볼륨으로 마운트합니다.
+    *   **Secure Deployment**: 배포 파이프라인(CD)이나 Manifest 파일 어디에도 실제 시크릿 값이 포함되지 않습니다. 오직 애플리케이션이 실행될 때 Vault로부터 동적으로 값을 주입받아 완벽한 보안을 유지합니다.
     *   Kubernetes Auth Method를 사용하여 파드의 ServiceAccount 인증.
 
 ### 4.2 Policy as Code (Kyverno)
