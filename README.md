@@ -107,7 +107,28 @@ Grafana 생태계의 도구들을 통합하여 **LGTM (Loki, Grafana, Tempo, Mim
 
 ---
 
-## 📂 6. 디렉토리 구조 상세 (Directory Structure)
+---
+
+## ⚙️ 6. 운영 최적화 및 개발 편의성 (Operational Excellence)
+
+인프라를 구축하는 것을 넘어, **지속 가능한 운영**과 **개발자 생산성 향상**을 위한 도구들을 도입했습니다.
+
+### 6.1 Cluster High Availability (Descheduler)
+*   **문제**: 클러스터 운영 기간이 길어질수록, 특정 노드에 파드가 몰리거나 리소스 활용 불균형이 발생.
+*   **해결**: **Kubernetes Descheduler**를 도입하여 주기적으로 정책(Policy)을 실행합니다.
+    *   `RemoveDuplicates`: 동일 노드에 중복 배포된 파드를 분산.
+    *   `LowNodeUtilization`: 리소스 사용률이 낮은 노드를 찾아 파드를 재배치(Rebalancing).
+    *   이를 통해 **노드 리소스 효율성을 극대화**하고 특정 노드 장애 시 영향도를 최소화합니다.
+
+### 6.2 Developer Experience (Automated Bastion Access)
+*   **문제**: 보안을 위해 Private Subnet에 위치한 OKE 클러스터 및 DB에 접근하기 위해 복잡한 터널링 명령어가 필요.
+*   **해결**: OCI Python SDK를 활용한 **자동화 스크립트 (`bastion_connection.sh`)** 개발.
+    *   단 한 줄의 명령어로 세션 생성, MFA 인증, SSH 터널링, 로컬 포트 포워딩까지 **All-in-One 자동화**.
+    *   `infra/bastion_connection.sh`를 통해 동료 개발자들이 손쉽게 프로덕션 DB 및 내부망에 접근 가능하도록 지원.
+
+---
+
+## 📂 7. 디렉토리 구조 상세 (Directory Structure)
 
 ### `infra/`
 Kubernetes 기반 인프라 애플리케이션의 Helm Chart 및 Manifest 모음입니다.
@@ -128,7 +149,7 @@ Kubernetes 기반 인프라 애플리케이션의 Helm Chart 및 Manifest 모음
 
 ---
 
-## 🚀 7. 기술적 차별점 (Technical Highlights)
+## 🚀 8. 기술적 차별점 (Technical Highlights)
 
 이 프로젝트에서 중점적으로 구현한 기술적 특징들은 다음과 같습니다.
 1.  **Platform Engineering**: 개발자가 비즈니스 로직에만 집중할 수 있도록 셀프 서비스 가능한 인프라 환경 구축.
