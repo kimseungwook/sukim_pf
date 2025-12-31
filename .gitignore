@@ -38,3 +38,11 @@ terraform.rc
 infra/tekton/secret
 
 build-pipelines/tekton/secret
+
+# Specific secret files already committed
+infra/authentik/secret.yaml
+infra/cloudnative-pg/ecommerce-pg-secret.yaml
+infra/cloudnative-pg/nocodb-pg-secrets.yaml
+infra/falco/webui_secret.yaml
+infra/harbor/secret.yaml
+infra/lgtm_stack/tempo/files/tempo-objstore-secret.yaml
