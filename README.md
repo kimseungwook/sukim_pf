@@ -126,13 +126,13 @@ Kubernetes 기반 인프라 애플리케이션의 Helm Chart 및 Manifest 모음
 
 ---
 
-## 🚀 7. 핵심 역량 (Key Competencies demonstrated)
+## 🚀 7. 기술적 차별점 (Technical Highlights)
 
-이 포트폴리오를 통해 검증된 역량은 다음과 같습니다.
+이 프로젝트에서 중점적으로 구현한 기술적 특징들은 다음과 같습니다.
 1.  **Platform Engineering**: 개발자가 비즈니스 로직에만 집중할 수 있도록 셀프 서비스 가능한 인프라 환경 구축.
-2.  **Advanced Kubernetes**: Custom Resource Definition (CRD), Operator 패턴, Admission Controller에 대한 깊은 이해.
+2.  **Advanced Kubernetes**: Custom Resource Definition (CRD), Operator 패턴, Admission Controller의 적극적인 활용.
 3.  **DevSecOps**: 보안이 "나중에 추가되는 것"이 아니라 파이프라인 초기 단계부터 통합된(Shift-Left) 환경 구현.
-4.  **Troubleshooting**: 분산 환경에서의 복잡한 문제를 추적하고 해결할 수 있는 관측성 시스템 설계 능력.
+4.  **Troubleshooting**: 분산 환경에서의 복잡한 문제를 추적하고 해결할 수 있는 관측성 시스템 설계.
 
 ---
 
