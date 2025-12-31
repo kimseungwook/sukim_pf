@@ -1,4 +1,120 @@
-helm repo add trivy-operator https://aquasecurity.github.io/helm-charts/
+# =============================================================================
+# Trivy Operator Installation Guide - Aqua Security Helm Chart
+# =============================================================================
 
-version 0.31.0
-helm upgrade --install trivy-operator trivy-operator/trivy-operator --version 0.31.0 -f trivy-operator/values.yaml -n trivy --create-namespace
+# -----------------------------------------------------------------------------
+# 개요
+# -----------------------------------------------------------------------------
+# - Kubernetes 클러스터 보안 스캐너
+# - Vulnerability reports (취약점)
+# - ConfigAudit reports (설정 감사)
+# - ExposedSecret reports (노출된 시크릿)
+# - RBACAssessment reports (RBAC 권한 점검)
+# - Compliance reports (규정 준수)
+
+# -----------------------------------------------------------------------------
+# Step 1: Helm Repo 추가
+# -----------------------------------------------------------------------------
+helm repo add aqua https://aquasecurity.github.io/helm-charts/
+helm repo update
+
+# -----------------------------------------------------------------------------
+# Step 2: Namespace 생성 (옵션, helm 명령어에 포함됨)
+# -----------------------------------------------------------------------------
+# kubectl create namespace trivy
+
+# -----------------------------------------------------------------------------
+# Step 3: Trivy Operator 설치
+# -----------------------------------------------------------------------------
+helm upgrade --install trivy-operator aqua/trivy-operator \
+  --version 0.24.1 \
+  -f infra/trivy-operator/values.yaml \
+  -n trivy \
+  --create-namespace
+
+# Note: values.yaml에서 targetNamespaces 설정 확인 필요
+# 예: targetNamespaces: "ecommerce,argocd,..."
+
+# -----------------------------------------------------------------------------
+# Step 4: 설치 확인
+# -----------------------------------------------------------------------------
+kubectl get pods -n trivy
+kubectl get svc -n trivy
+
+# Pod 로그 확인
+kubectl logs -n trivy -l app.kubernetes.io/name=trivy-operator -f
+
+# -----------------------------------------------------------------------------
+# Step 5: 리포트 확인 (CRD)
+# -----------------------------------------------------------------------------
+# 취약점 리포트 확인 (특정 네임스페이스)
+kubectl get vulnerabilityreports -n ecommerce
+
+# 설정 감사 리포트 확인
+kubectl get configauditreports -n ecommerce
+
+# 노출된 시크릿 리포트 확인
+kubectl get exposedsecretreports -n ecommerce
+
+# 전체 리포트 갯수 확인
+kubectl get vulnerabilityreports --all-namespaces | wc -l
+
+# -----------------------------------------------------------------------------
+# 업그레이드
+# -----------------------------------------------------------------------------
+helm upgrade trivy-operator aqua/trivy-operator \
+  --version 0.24.1 \
+  -f infra/trivy-operator/values.yaml \
+  -n trivy
+
+# 릴리즈 히스토리 확인
+helm history trivy-operator -n trivy
+
+# 이전 버전으로 롤백 (필요시)
+# helm rollback trivy-operator [REVISION] -n trivy
+
+# -----------------------------------------------------------------------------
+# 삭제
+# -----------------------------------------------------------------------------
+helm uninstall trivy-operator -n trivy
+kubectl delete namespace trivy
+
+# CRD 삭제 (주의: 모든 리포트 데이터 삭제됨)
+# kubectl delete crd vulnerabilityreports.aquasecurity.github.io
+# kubectl delete crd configauditreports.aquasecurity.github.io
+# kubectl delete crd exposedsecretreports.aquasecurity.github.io
+# kubectl delete crd rbacassessmentreports.aquasecurity.github.io
+# kubectl delete crd clustercomplianceauditreports.aquasecurity.github.io
+# kubectl delete crd clusterconfigauditreports.aquasecurity.github.io
+# kubectl delete crd clusterrbacassessmentreports.aquasecurity.github.io
+# kubectl delete crd infraassessmentreports.aquasecurity.github.io
+# kubectl delete crd clusterinfraassessmentreports.aquasecurity.github.io
+# kubectl delete crd clustersbomreports.aquasecurity.github.io
+# kubectl delete crd sbomreports.aquasecurity.github.io
+
+# -----------------------------------------------------------------------------
+# 트러블슈팅
+# -----------------------------------------------------------------------------
+# 1. 스캔이 동작하지 않는 경우
+# Trivy Operator 로그 확인
+kubectl logs -n trivy -l app.kubernetes.io/name=trivy-operator
+
+# 2. Job 실패 확인
+kubectl get jobs -n ecommerce
+kubectl logs -n ecommerce job/<scan-job-name>
+
+# 3. Resource Quota 문제 확인
+# 스캔 Job이 생성되지 않거나 Pending 상태인 경우 Resource Quota 확인
+
+# 4. Helm 차트 값 확인
+helm get values trivy-operator -n trivy
+helm get manifest trivy-operator -n trivy
+
+# -----------------------------------------------------------------------------
+# 유용한 명령어
+# -----------------------------------------------------------------------------
+# 특정 리포트 상세 확인
+kubectl describe vulnerabilityreport <report-name> -n ecommerce
+
+# 심각도(Critical) 높은 취약점 필터링 (jq 필요)
+# kubectl get vulnerabilityreports -n ecommerce -o json | jq '.items[] | select(.report.summary.criticalCount > 0) | .metadata.name'

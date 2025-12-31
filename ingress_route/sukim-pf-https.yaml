@@ -240,6 +240,15 @@ spec:
           namespace: ecommerce
           port: 8080
     
+    
+    - kind: Rule
+      match: Host(`falco.8ai.store`)
+      priority: 10
+      services:
+        - name: falco-falcosidekick-ui
+          namespace: falco
+          port: 2802
+    
   tls:
     secretName: godaddy-tls
   # Include TLS configuration if Traefik is handling TLS2

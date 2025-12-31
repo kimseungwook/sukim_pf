@@ -7,4 +7,4 @@ spec:
     spec:
       containers:
         - name: ecommerce-frontend-container
-          image: harbor.8ai.store/ecommerce/ecommerce-frontend:5d46730-20251230020914
+          image: harbor.8ai.store/ecommerce/ecommerce-frontend:14f6f8d-20251230111410

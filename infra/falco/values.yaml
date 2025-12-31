@@ -8,16 +8,16 @@ affinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
       - matchExpressions:
-        # 'service=virtual' 레이블이 없는 노드에만 설치
-        - key: service
+        # 'node-type=virtual' 레이블이 없는 노드에만 설치
+        - key: node-type
           operator: NotIn
           values:
           - virtual
-        # 'workload-type=tekton-build' 레이블이 없는 노드에만 설치
-        - key: workload-type
+        # 'workload-type=sukim-build' 레이블이 없는 노드에만 설치
+        - key: workload
           operator: NotIn
           values:
-          - tekton-build
+          - sukim-build
 
 # 3. K8s 메타데이터: 풍부한 정보 수집 활성화
 collectors:
@@ -31,7 +31,7 @@ metrics:
 serviceMonitor:
   create: true
   labels:
-    release: goyo-prometheus-stack
+    release: prometheus-stack
   endpointPort: "metrics"
   path: "/metrics"
   interval: "30s"
@@ -42,18 +42,18 @@ falcosidekick:
   enabled: true
   webui:
     enabled: true
-    user: "goyoai:Goyoai123!@#"
+    existingSecret: "falcosidekick-ui-secret"
   config:
     slack:
       webhookurl: "https://hooks.slack.com/services/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"
       minimumpriority: "warning"
     loki:
-      hostport: "http://goyo-loki-distributed-gateway.lgtm.svc.cluster.local:80"
+      hostport: "http://loki-gateway.monitoring.svc.cluster.local:80"
       minimumpriority: "notice"
     serviceMonitor:
       create: true
       labels:
-        release: goyo-prometheus-stack
+        release: prometheus-stack
 
 # 6. (추가됨) Falcoctl: 룰셋 및 플러그인 관리
 # 이것이 없으면 Falco가 룰 없이 실행될 수 있습니다.
@@ -110,7 +110,6 @@ customRules:
         harbor,
         kube-system,
         kyverno,           # 중요: 정책 검사 및 리포트 생성
-        istio-system,      # 중요: 서비스 메시 컨트롤 플레인
         traefik,           # 중요: 인그레스 컨트롤러
         keda,              # 오토스케일링 컨트롤러
         descheduler,       # 스케줄링 최적화
@@ -118,7 +117,7 @@ customRules:
         vpa,               # 수직 오토스케일링
         goldilocks,        # VPA 추천
         prometheus,        # (monitoring 대신 실제 존재하는 NS)
-        lgtm,              # (로그/모니터링 스택)
+        monitoring,              # (로그/모니터링 스택)
         metrics-server,    # 메트릭 집계
         falco,             # 보안
         tekton-operator,   # Tekton Operator

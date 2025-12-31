@@ -1,16 +1,114 @@
+# =============================================================================
+# OpenTelemetry Collector Installation Guide - Helm Chart
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 개요
+# -----------------------------------------------------------------------------
+# - Deployment 모드로 설치 (중앙 집중형)
+# - OpenTelemetry 트레이스 수집 및 Tempo로 전송
+# - OTLP gRPC (4317), OTLP HTTP (4318) 프로토콜 지원
+# - HPA 자동 스케일링 지원 (1-2 replicas)
+
+# -----------------------------------------------------------------------------
+# Step 1: Helm Repo 추가
+# -----------------------------------------------------------------------------
 helm repo add opentelemetry-helm https://open-telemetry.github.io/opentelemetry-helm-charts
-helm upgrade --install goyo-otlp opentelemetry-helm/opentelemetry-collector --version 0.85.0 -f otel-collector/values.yaml -n otlp
+helm repo update
 
+# -----------------------------------------------------------------------------
+# Step 2: Namespace 생성
+# -----------------------------------------------------------------------------
+kubectl create namespace otlp
 
-helm upgrade --install backend-system-oltp opentelemetry-helm/opentelemetry-collector -f otel-collector/backend-system-values.yaml -n otlp
+# -----------------------------------------------------------------------------
+# Step 3: OpenTelemetry Collector 설치
+# -----------------------------------------------------------------------------
+helm upgrade --install otel-collector opentelemetry-helm/opentelemetry-collector \
+  --version 0.142.1 \
+  -f infra/otel-collector/values.yaml \
+  -n otlp \
+  --create-namespace
 
-----
-helm upgrade --install backend-portal-oltp opentelemetry-helm/opentelemetry-collector -f otel-collector/backend-portal-values.yaml -n otlp
+# -----------------------------------------------------------------------------
+# Step 4: 설치 확인
+# -----------------------------------------------------------------------------
+kubectl get pods -n otlp
+kubectl get svc -n otlp
+kubectl get hpa -n otlp
 
+# Pod 로그 확인
+kubectl logs -n otlp -l app.kubernetes.io/name=opentelemetry-collector -f
 
-------otel-gointern-------
-helm upgrade --install gointern-oltp opentelemetry-helm/opentelemetry-collector -f otel-collector/gointern-otel-values.yaml -n otlp
+# Pod 상태 확인
+kubectl describe pod -n otlp -l app.kubernetes.io/name=opentelemetry-collector
 
+# -----------------------------------------------------------------------------
+# Step 5: 엔드포인트 정보
+# -----------------------------------------------------------------------------
+# 애플리케이션에서 트레이스 전송 시 사용:
+# - OTLP gRPC: otel-collector.otlp.svc.cluster.local:4317
+# - OTLP HTTP: otel-collector.otlp.svc.cluster.local:4318
+# - Metrics: otel-collector.otlp.svc.cluster.local:8888
 
-------otel-aify-------
-helm upgrade --install aify-oltp opentelemetry-helm/opentelemetry-collector -f otel-collector/aify-otel-values.yaml -n otlp
+# -----------------------------------------------------------------------------
+# 업그레이드
+# -----------------------------------------------------------------------------
+helm upgrade otel-collector opentelemetry-helm/opentelemetry-collector \
+  --version 0.85.0 \
+  -f infra/otel-collector/values.yaml \
+  -n otlp
+
+# 릴리즈 히스토리 확인
+helm history otel-collector -n otlp
+
+# 이전 버전으로 롤백 (필요시)
+# helm rollback otel-collector [REVISION] -n otlp
+
+# -----------------------------------------------------------------------------
+# 삭제
+# -----------------------------------------------------------------------------
+helm uninstall otel-collector -n otlp
+kubectl delete namespace otlp
+
+# -----------------------------------------------------------------------------
+# 트러블슈팅
+# -----------------------------------------------------------------------------
+# 1. Pod가 시작되지 않는 경우
+kubectl describe pod -n otlp -l app.kubernetes.io/name=opentelemetry-collector
+kubectl logs -n otlp -l app.kubernetes.io/name=opentelemetry-collector --previous
+
+# 2. Tempo 연결 확인
+kubectl logs -n otlp -l app.kubernetes.io/name=opentelemetry-collector | grep -i "tempo\|error\|export"
+
+# 3. 메모리/CPU 리소스 확인
+kubectl top pods -n otlp
+
+# 4. Health Check 확인
+kubectl exec -it -n otlp <otel-pod-name> -- wget -qO- http://localhost:13133/
+
+# 5. Helm 차트 값 확인
+helm get values otel-collector -n otlp
+helm get manifest otel-collector -n otlp
+
+# -----------------------------------------------------------------------------
+# 애플리케이션 설정 (환경변수)
+# -----------------------------------------------------------------------------
+# Spring Boot / Java:
+# OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector.otlp.svc.cluster.local:4317
+# OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+# OTEL_SERVICE_NAME=your-service-name
+
+# Go (OpenTelemetry SDK):
+# export OTEL_EXPORTER_OTLP_ENDPOINT="otel-collector.otlp.svc.cluster.local:4317"
+# export OTEL_EXPORTER_OTLP_INSECURE="true"
+
+# -----------------------------------------------------------------------------
+# 유용한 명령어
+# -----------------------------------------------------------------------------
+# OTel Collector 설정 확인
+kubectl exec -it -n otlp <otel-pod-name> -- cat /conf/relay.yaml
+
+# 메트릭 확인
+kubectl port-forward -n otlp svc/otel-collector 8888:8888
+# curl http://localhost:8888/metrics

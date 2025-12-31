@@ -5,7 +5,7 @@ metadata:
 spec:
   template:
     spec:
-      # serviceAccountName: goyoai-vault-sa  # TODO: Vault 연동 시 활성화
+      serviceAccountName: ecommerce-vault-sa
       containers:
         - name: ecommerce-backend-container
-          image: harbor.8ai.store/ecommerce/ecommerce-backend:607851b-20251229142609
+          image: harbor.8ai.store/ecommerce/ecommerce-backend:e92e2d4-20251230144830

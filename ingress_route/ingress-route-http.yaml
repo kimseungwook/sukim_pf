@@ -165,3 +165,13 @@ spec:
           name: ecommerce-backend
           namespace: ecommerce
           port: 8080
+
+    - kind: Rule
+      match: Host(`falco.8ai.store`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: falco-falcosidekick-ui
+          namespace: falco
+          port: 2802

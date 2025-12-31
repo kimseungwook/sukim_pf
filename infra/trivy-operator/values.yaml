@@ -2,7 +2,7 @@
 # Trivy Operator - Enhanced Configuration
 
 # ===== 스캔 대상 네임스페이스 =====
-targetNamespaces: "sukim-web,argocd,kyverno,falco,trivy,vault,authentik"
+targetNamespaces: "ecommerce,argocd,kyverno,falco,trivy,vault,authentik"
 excludeNamespaces: "kube-system,kube-public,kube-node-lease,prometheus,cert-manager,monitoring,harbor,tekton-pipelines,default"
 
 # ===== 이미지 설정 =====

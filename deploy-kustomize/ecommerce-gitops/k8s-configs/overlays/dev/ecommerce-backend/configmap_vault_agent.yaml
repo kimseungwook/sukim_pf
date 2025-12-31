@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ecommerce-backend-vault-config
+  namespace: ecommerce
+data:
+  vault-agent.hcl: |
+    auto_auth {
+      method {
+        type = "kubernetes"
+        mount_path = "auth/kubernetes"
+        config = {
+          role = "ecommerce"
+        }
+      }
+      
+      sink {
+        type = "file"
+        config = {
+          path = "/home/vault/.vault-token"
+        }
+      }
+    }
+    
+    exit_after_auth = false
+    
+    vault {
+      address = "http://vault.vault.svc.cluster.local:8200"
+    }
+    
+    template {
+      destination = "/vault/secrets/app.env"
+      contents = <<EOT
+    {{- with secret "ecommerce/data/backend" -}}
+    export ENVIRONMENT={{ index .Data.data "ENVIRONMENT" | printf "%q" }}
+    export HTTP_PORT={{ index .Data.data "HTTP_PORT" | printf "%q" }}
+    export AUTH_SECRET={{ index .Data.data "AUTH_SECRET" | printf "%q" }}
+    
+    export DATABASE_URI={{ index .Data.data "DATABASE_URI" | printf "%q" }}
+    
+    export REDIS_URI={{ index .Data.data "REDIS_URI" | printf "%q" }}
+    export REDIS_PASSWORD={{ index .Data.data "REDIS_PASSWORD" | printf "%q" }}
+    export REDIS_DB={{ index .Data.data "REDIS_DB" | printf "%q" }}
+    
+    export MINIO_ENDPOINT={{ index .Data.data "MINIO_ENDPOINT" | printf "%q" }}
+    export MINIO_ACCESSKEY={{ index .Data.data "MINIO_ACCESSKEY" | printf "%q" }}
+    export MINIO_SECRETKEY={{ index .Data.data "MINIO_SECRETKEY" | printf "%q" }}
+    export MINIO_BUCKET={{ index .Data.data "MINIO_BUCKET" | printf "%q" }}
+    export MINIO_BASEURL={{ index .Data.data "MINIO_BASEURL" | printf "%q" }}
+    export MINIO_USESSL={{ index .Data.data "MINIO_USESSL" | printf "%q" }}
+    
+    export MAIL_PORT={{ index .Data.data "MAIL_PORT" | printf "%q" }}
+    export MAIL_HOST={{ index .Data.data "MAIL_HOST" | printf "%q" }}
+    export MAIL_USER={{ index .Data.data "MAIL_USER" | printf "%q" }}
+    export MAIL_PASSWORD={{ index .Data.data "MAIL_PASSWORD" | printf "%q" }}
+    export MAIL_FROM={{ index .Data.data "MAIL_FROM" | printf "%q" }}
+    {{ end -}}
+    EOT
+    }
+    
+    template_config {
+      exit_on_retry_failure = true
+    }

@@ -3,7 +3,10 @@ kind: Kustomization
 namespace: ecommerce
 resources:
   - ../../../base/ecommerce-backend
-  - configmap_env.yaml
+  # - configmap_env.yaml # Vault 사용으로 주석 처리
+  - configmap_vault_agent.yaml
+  - configmap_promtail_sidecar.yaml
+
 patches:
   - target:
       group: apps
@@ -23,9 +26,27 @@ patches:
       kind: Deployment
       name: ecommerce-backend
     path: replica_config.yaml
+  # - target:  # Vault 사용으로 주석 처리
+  #     group: apps
+  #     version: v1
+  #     kind: Deployment
+  #     name: ecommerce-backend
+  #   path: env_patch.yaml
   - target:
       group: apps
       version: v1
       kind: Deployment
       name: ecommerce-backend
-    path: env_patch.yaml
+    path: vault_manual_sidecar.yaml
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: ecommerce-backend
+    path: command_args.yaml
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: ecommerce-backend
+    path: promtail_sidecar.yaml

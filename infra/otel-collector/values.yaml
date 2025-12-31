@@ -1,8 +1,68 @@
-mode: daemonset
+mode: deployment
+nameOverride: "otel-collector"
+fullnameOverride: "otel-collector"
+
+replicaCount: 1  # HA 구성
+
+image:
+  repository: docker.io/otel/opentelemetry-collector-contrib
+  pullPolicy: IfNotPresent
+  tag: "0.134.1"
+
+resources:
+  limits:
+    cpu: 1500m
+    memory: 3Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+useGOMEMLIMIT: true
+
+ports:
+  otlp:
+    enabled: true
+    containerPort: 4317
+    servicePort: 4317
+    protocol: TCP
+  otlp-http:
+    enabled: true
+    containerPort: 4318
+    servicePort: 4318
+    protocol: TCP
+  metrics:
+    enabled: true
+    containerPort: 8888
+    servicePort: 8888
+    protocol: TCP
+  healthcheck:
+    enabled: true
+    containerPort: 13133
+    servicePort: 13133
+    protocol: TCP
+
+command:
+  name: otelcol-contrib
 
 service:
   enabled: true
   type: ClusterIP
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8888"
+
+clusterRole:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: ["pods", "nodes", "namespaces"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: [""]
+      resources: ["nodes/metrics", "nodes/stats"]
+      verbs: ["get", "list", "watch"]
+
+serviceAccount:
+  create: true
 
 config:
   receivers:
@@ -10,77 +70,146 @@ config:
       protocols:
         grpc:
           endpoint: 0.0.0.0:4317
+          max_recv_msg_size_mib: 4
         http:
-          endpoint: 0.0.0.0:4318  # Assuming you want to keep HTTP receiver as well
-    prometheus:
-        config:
-          scrape_configs:
-          - job_name: " goyoai-web"
-            scrape_interval: 5s
-            metrics_path: "/actuator/prometheus"
-            static_configs:
-            - targets:
-              - goyoai-backend-system-actuator.goyoai-web.svc.cluster.local:9292
+          endpoint: 0.0.0.0:4318
+
+  processors:
+    memory_limiter:
+      check_interval: 1s
+      limit_percentage: 70
+      spike_limit_percentage: 20
+    
+    batch:
+      send_batch_size: 8000
+      timeout: 10s
+      send_batch_max_size: 15000
+    
+    k8sattributes:
+      auth_type: serviceAccount
+      passthrough: false
+      extract:
+        metadata:
+          - k8s.pod.name
+          # - k8s.pod.uid
+          - k8s.deployment.name
+          - k8s.namespace.name
+          - k8s.node.name
+          # - k8s.container.name
+    
+    # probabilistic_sampler:
+    #   hash_seed: 22
+    #   sampling_percentage: 10
+    
+    resource:
+      attributes:
+        - key: cluster
+          value: ecommerce
+          action: upsert
+    #     - key: service.name
+    #       value: goyoai-backend-system-app
+    #       action: upsert
+    #     - key: service.namespace
+    #       value: goyoai-web
+    #       action: upsert
+    #     - key: deployment.environment
+    #       value: prod
+    #       action: upsert
 
   exporters:
-    logging:
-      loglevel: debug
-    otlp:
-      endpoint: goyo-tempo-distributed-distributor.monitoring.svc.cluster.local:4317  # Updated to Tempo's gRPC endpoint
+    # debug:
+    #   verbosity: detailed
+    otlp/tempo:
+      endpoint: tempo-distributor.monitoring.svc.cluster.local:4317
       tls:
-        insecure: true  # Ensure this matches your environment's security configuration
-    prometheus:
-        endpoint: goyo-prometheus-stack-kube-prometheus.prometheus.svc.cluster.local:9090
-        const_labels:
-          label1: goyoai-web
-    prometheusremotewrite:
-        endpoint: "http://goyo-mimir-distributed-gateway.monitoring.svc:80/api/v1/push"
-        tls:
-          insecure: true
-  processors:
-    batch:
-      timeout: 5s
-      send_batch_size: 1024
+        insecure: true
+      retry_on_failure:
+        enabled: true
+        initial_interval: 5s
+        max_interval: 60s
+        max_elapsed_time: 300s
+      sending_queue:
+        enabled: true
+        num_consumers: 15
+        queue_size: 3000
+      compression: gzip
 
   service:
+    telemetry:
+      metrics:
+        address: 0.0.0.0:8888
+        level: normal
+      logs:
+        level: info
+        development: false
+    
+    extensions: [health_check]
+    
     pipelines:
       traces:
         receivers: [otlp]
-        processors: [batch]
-        exporters: [logging, otlp]
+        processors: [memory_limiter,resource, batch]
+        exporters: [otlp/tempo]
 
-serviceAccount:
-  create: true
+# tolerations:
+#   - key: "goyo-svc"
+#     operator: "Equal"
+#     value: "goyoai-build"
+#     effect: "NoSchedule"
 
-tolerations:  
-  - key: "goyo-svc"
-    operator: "Equal"
-    value: "back"
-    effect: "NoSchedule"  
+# affinity:
+#   nodeAffinity:
+#     requiredDuringSchedulingIgnoredDuringExecution:
+#       nodeSelectorTerms:
+#       - matchExpressions:
+#         - key: "workload"
+#           operator: In
+#           values:
+#           - "goyoai-build"
 
-affinity:
-  nodeAffinity:
-    requiredDuringSchedulingIgnoredDuringExecution:
-      nodeSelectorTerms:
-      - matchExpressions:
-        - key: "goyo-svc"
-          operator: In
-          values:
-          - "back"
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
 
-ports:
-  otlp:
-    enabled: true
-    containerPort: 4317  # gRPC
-    servicePort: 4317
-    protocol: TCP
-  otlp-http:
-    enabled: true
-    containerPort: 4318  # HTTP
-    servicePort: 4318
-    protocol: TCP
-  metrics:
-    enabled: true
-
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  
 serviceMonitor:
   enabled: true
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8888"
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: 13133
+  initialDelaySeconds: 30
+  periodSeconds: 30
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: 13133
+  initialDelaySeconds: 10
+  periodSeconds: 10
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  fsGroup: 65534
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65534
+  runAsGroup: 65534
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
