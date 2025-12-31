@@ -76,7 +76,7 @@ nodeSelector:
   service: "monitoring"
 
 tolerations: #[]
-- key: "goyo-svc"
+- key: "service"
   operator: "Equal"
   value: "monitoring"
   effect: "NoSchedule"

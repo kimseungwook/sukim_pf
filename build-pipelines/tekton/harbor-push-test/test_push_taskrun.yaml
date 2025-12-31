@@ -12,7 +12,7 @@ spec:
   workspaces:
     - name: source
       persistentVolumeClaim:
-        claimName: goyoai-web-back
+        claimName: dev-back-dev
     - name: dockerconfig
       secret:
         secretName: harborcred

@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: descheduler
-  namespace: goyoai-web
+  namespace: ecommerce
 spec:
   replicas: 1
   selector:
@@ -32,13 +32,13 @@ spec:
         configMap:
           name: descheduler-policy
       nodeSelector:
-        goyo-svc: monitoring
+        service: tools
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: descheduler-policy
-  namespace: goyoai-web
+  namespace: ecommerce
 data:
   policy.yaml: |
     apiVersion: "descheduler/v1alpha2"
@@ -123,12 +123,9 @@ data:
       RemovePodsViolatingNodeTaints:
         enabled: true
     namespacesInclude:
-    - goyoai-web
+    - ecommerce
     nodeSelectorInclude:
-    - goyo-svc=ai-server
-    - goyo-svc=backend-relay
-    - goyo-svc=back-portal
-    - goyo-svc=frontend-web
+    - service=tools
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -159,10 +156,10 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: descheduler
-  namespace: goyoai-web
+  namespace: ecommerce
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: descheduler
-  namespace: goyoai-web
+  namespace: ecommerce

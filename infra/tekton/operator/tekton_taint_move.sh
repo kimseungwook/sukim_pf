@@ -14,13 +14,13 @@ for deployment in $DEPLOYMENTS; do
         "template": {
           "spec": {
             "nodeSelector": {
-              "goyo-svc": "deploy"
+              "service": "tools"
             },
             "tolerations": [
               {
-                "key": "goyo-svc",
+                "key": "service",
                 "operator": "Equal",
-                "value": "deploy",
+                "value": "tools",
                 "effect": "NoSchedule"
               }
             ]
@@ -40,13 +40,13 @@ kubectl patch deployment tekton-operator -n tekton-operator -p '{
     "template": {
       "spec": {
         "nodeSelector": {
-          "goyo-svc": "deploy"
+          "service": "tools"
         },
         "tolerations": [
           {
-            "key": "goyo-svc",
+            "key": "service",
             "operator": "Equal",
-            "value": "deploy",
+            "value": "tools",
             "effect": "NoSchedule"
           }
         ]

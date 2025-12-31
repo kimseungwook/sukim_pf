@@ -49,5 +49,5 @@ docker_backend: "application/ecommerce/backend/Dockerfile.backend"
 go_context_dir: "application/ecommerce/backend"
 
 # Slack
-slack_webhook_url: "https://hooks.slack.com/services/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"
+slack_webhook_url: "https://hooks.slack.com/services/xxx/xxx/xxx"
 slack_message: "Build completed"

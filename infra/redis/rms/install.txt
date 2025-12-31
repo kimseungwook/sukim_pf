@@ -1,9 +1,0 @@
-helm repo add bitnami https://charts.bitnami.com/bitnami
-
----ai-server---
-helm upgrade --install goyo-redis bitnami/redis --version 19.5.2 -f redis/back-portal/values.yaml -n redis
-
----portal---
-helm upgrade --install goyoai-web-back-portal-qa-redis bitnami/redis --version 19.5.2 -f redis/back-portal/values.yaml -n redis
----rms---
-helm upgrade --install rms-redis bitnami/redis --version 19.5.2 -f redis/rms/values.yaml -n rms

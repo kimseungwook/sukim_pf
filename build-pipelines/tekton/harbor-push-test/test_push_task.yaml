@@ -7,7 +7,7 @@ spec:
   params:
     - name: image-name
       type: string
-      default: goyoai-web/goyoai-web-back-dev
+      default: dev/dev-back-dev
     - name: image-tag
       type: string
       default: latest
@@ -46,7 +46,7 @@ spec:
       args:
         - --context=$(workspaces.source.path)
         - --dockerfile=$(workspaces.source.path)/Dockerfile
-        - --destination=gdharbor.goyoai.com/$(params.image-name):$(params.image-tag)
+        - --destination=xxx.xxx.xxx/$(params.image-name):$(params.image-tag)
         # - --registry-mirror=https://gdharbor.goyoai.com
         # - --force
         - --insecure

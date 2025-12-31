@@ -1,3 +1,0 @@
-helm repo add bitnami https://charts.bitnami.com/bitnami
-
-helm upgrade --install sukim-web bitnami/redis -f redis/sukim-web/values.yaml -n redis --create-namespace

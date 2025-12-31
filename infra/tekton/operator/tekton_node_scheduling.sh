@@ -14,11 +14,11 @@ spec:
   targetNamespace: tekton-pipelines
   config:
     nodeSelector:
-      goyo-svc: deploy
+      service: tools
     tolerations:
-    - key: "goyo-svc"
+    - key: "service"
       operator: "Equal"
-      value: "deploy"
+      value: "tools"
       effect: "NoSchedule"
   dashboard:
     readonly: false

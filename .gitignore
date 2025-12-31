@@ -34,3 +34,7 @@ terraform.rc
 **/authentik_secret.yaml
 **/minio-secret.yaml
 **/harbor-registry-s3-secret.yaml
+
+infra/tekton/secret
+
+build-pipelines/tekton/secret

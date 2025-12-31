@@ -1,9 +1,0 @@
-apiVersion: traefik.containo.us/v1alpha1
-kind: Middleware
-metadata:
-  name: striptransferencoding
-  namespace: hyper-report-backend-relay
-spec:
-  headers:
-    customResponseHeaders:
-      Transfer-Encoding: ""

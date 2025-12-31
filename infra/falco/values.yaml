@@ -45,7 +45,7 @@ falcosidekick:
     existingSecret: "falcosidekick-ui-secret"
   config:
     slack:
-      webhookurl: "https://hooks.slack.com/services/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"
+      webhookurl: "https://hooks.slack.com/services/xxxxx/xxxxx/xxxxx"
       minimumpriority: "warning"
     loki:
       hostport: "http://loki-gateway.monitoring.svc.cluster.local:80"

@@ -1,0 +1,94 @@
+# =============================================================================
+# Redis Installation Guide - Ecommerce Cache & Session Store
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 개요
+# -----------------------------------------------------------------------------
+# - In-memory Data Structure Store (Cache, Message Broker)
+# - Ecommerce 서비스의 세션 관리 및 캐싱 용도
+# - Master-Replica 아키텍처 (고가용성)
+
+# -----------------------------------------------------------------------------
+# Step 1: Helm Repo 추가
+# -----------------------------------------------------------------------------
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+
+# -----------------------------------------------------------------------------
+# Step 2: Namespace 생성 (옵션, helm 명령어에 포함됨)
+# -----------------------------------------------------------------------------
+# kubectl create namespace redis
+
+# -----------------------------------------------------------------------------
+# Step 3: Redis 설치
+# -----------------------------------------------------------------------------
+# - architecture: replication (Master-Replica)
+# - auth.enabled: true (비밀번호 설정 권장)
+# - master.persistence.enabled: true (데이터 영속성)
+
+helm upgrade --install ecommerce-redis bitnami/redis \
+  --version 20.0.0 \
+  -f infra/redis/ecommerce/values.yaml \
+  -n redis \
+  --create-namespace
+
+# Note: values.yaml에서 resource limits, password 등 확인 필요
+
+# -----------------------------------------------------------------------------
+# Step 4: 설치 확인
+# -----------------------------------------------------------------------------
+kubectl get pods -n redis
+kubectl get svc -n redis
+
+# Master/Replica Pod 상태 확인
+kubectl get statefulsets -n redis
+
+# -----------------------------------------------------------------------------
+# Step 5: 동작 테스트
+# -----------------------------------------------------------------------------
+# 1. Redis Master 접속 테스트 (비밀번호 필요 시 -a 옵션 사용)
+# export REDIS_PASSWORD=$(kubectl get secret --namespace redis ecommerce-redis -o jsonpath="{.data.redis-password}" | base64 -d)
+# kubectl run --namespace redis redis-client --restart='Never'  --env REDIS_PASSWORD=$REDIS_PASSWORD  --image docker.io/bitnami/redis:7.4.1-debian-12-r0 --command -- bash
+# (Pod 내부에서) redis-cli -h ecommerce-redis-master -a $REDIS_PASSWORD set test "hello"
+# (Pod 내부에서) redis-cli -h ecommerce-redis-master -a $REDIS_PASSWORD get test
+
+# -----------------------------------------------------------------------------
+# 업그레이드
+# -----------------------------------------------------------------------------
+helm upgrade ecommerce-redis bitnami/redis \
+  --version 20.0.0 \
+  -f infra/redis/ecommerce/values.yaml \
+  -n redis
+
+# 릴리즈 히스토리 확인
+helm history ecommerce-redis -n redis
+
+# 이전 버전으로 롤백 (필요시)
+# helm rollback ecommerce-redis [REVISION] -n redis
+
+# -----------------------------------------------------------------------------
+# 삭제
+# -----------------------------------------------------------------------------
+helm uninstall ecommerce-redis -n redis
+kubectl delete namespace redis
+
+# PVC 삭제 (주의: 데이터 영구 삭제됨)
+# kubectl delete pvc -l app.kubernetes.io/instance=ecommerce-redis -n redis
+
+# -----------------------------------------------------------------------------
+# 트러블슈팅
+# -----------------------------------------------------------------------------
+# 1. Password 인증 실패
+# - Secret 확인: kubectl get secret ecommerce-redis -n redis -o yaml
+# - base64 디코딩하여 비밀번호 확인
+
+# 2. Persistence Volume Mount 실패
+# - StorageClass 확인: kubectl get sc
+# - PVC 상태 확인: kubectl get pvc -n redis
+
+# -----------------------------------------------------------------------------
+# 유용한 명령어
+# -----------------------------------------------------------------------------
+# Redis 설정(ConfigMap) 확인
+kubectl get cm ecommerce-redis-configuration -n redis -o yaml

@@ -90,10 +90,6 @@ registry:
     image:
       repository: docker.io/goharbor/harbor-registryctl
       tag: v2.14.0
-  # credentials:
-  #   # Registry credentials from Secret
-  #   existingSecret: "harbor-secrets"
-  #   username: "goyoai_harbor"
   <<: *commonSettings
 
 trivy:
