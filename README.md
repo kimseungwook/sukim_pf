@@ -160,6 +160,6 @@ Kubernetes 기반 인프라 애플리케이션의 Helm Chart 및 Manifest 모음
 ---
 
 ## 📧 Contact
-*   **Name**: [성함 입력]
-*   **Email**: [이메일 입력]
-*   **LinkedIn/Blog**: [링크 입력]
+*   **Name**: 김승욱
+*   **Email**: refresh11@gmail.com
+*   **LinkedIn/Blog**: https://github.com/kimseungwook/sukim_pf
