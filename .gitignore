@@ -46,3 +46,9 @@ infra/cloudnative-pg/nocodb-pg-secrets.yaml
 infra/falco/webui_secret.yaml
 infra/harbor/secret.yaml
 infra/lgtm_stack/tempo/files/tempo-objstore-secret.yaml
+
+# Portfolio Files (Excluded from Repo)
+SERVICE_CATALOG.md
+PORTFOLIO_FOR_PDF.md
+PORTFOLIO_FOR_PDF.pdf
+
