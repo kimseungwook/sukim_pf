@@ -239,8 +239,7 @@ spec:
         - name: ecommerce-backend
           namespace: ecommerce
           port: 8080
-    
-    
+      
     - kind: Rule
       match: Host(`falco.8ai.store`)
       priority: 10
@@ -248,6 +247,25 @@ spec:
         - name: falco-falcosidekick-ui
           namespace: falco
           port: 2802
+      
+    - kind: Rule
+      match: Host(`redis.8ai.store`)
+      priority: 10
+      middlewares:
+        - name: forwardauth
+          namespace: traefik
+      services:
+        - name: redisinsight
+          namespace: redis
+          port: 5540
+    
+    - kind: Rule
+      match: Host(`redis.8ai.store`) && PathPrefix(`/outpost.goauthentik.io/`)
+      priority: 20
+      services:
+        - name: authentik-server
+          namespace: authentik
+          port: 80
     
   tls:
     secretName: godaddy-tls

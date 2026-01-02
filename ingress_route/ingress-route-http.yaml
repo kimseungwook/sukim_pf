@@ -175,3 +175,13 @@ spec:
           name: falco-falcosidekick-ui
           namespace: falco
           port: 2802
+
+    - kind: Rule
+      match: Host(`redis.8ai.store`)
+      middlewares:
+        - name: redirect-http-https
+      services:
+        - kind: Service
+          name: redisinsight
+          namespace: redis
+          port: 5540
