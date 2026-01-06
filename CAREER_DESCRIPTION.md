@@ -213,10 +213,10 @@
 
 ## 2. 프로젝트: 국내 최초 STO 부동산 조각투자 플랫폼 인프라 구축 및 ISMS 인증
 
-**기간**: 2021.10 ~ 2022.12
-**소속**: 비브릭
+**기간**: 2021.10 ~ 2022.12  
+**소속**: 비브릭  
 **역할**: DevOps Engineer  
-**기술 스택**:
+**기술 스택**:  
 - Infrastructure as Code: Terraform (AWS 전체 인프라 관리)
 - Cloud & Infrastructure: AWS (VPC, EC2, RDS, ECS Fargate, WorkSpaces, SSM)
 - Network: VPN Site-to-Site (Fortigate UTM ↔ AWS VPC)
@@ -286,10 +286,10 @@
 
 ## 3. 프로젝트: Hyperledger Besu 기반 Private Blockchain 플랫폼 구축 (PoC)
 
-**기간**: 2022.12 ~ 2023.08
-**소속**: 비브릭
+**기간**: 2022.12 ~ 2023.08  
+**소속**: 비브릭  
 **역할**: DevOps Engineer  
-**기술 스택**:
+**기술 스택**:  
 - Infrastructure as Code: Terraform (AWS 전체 인프라 관리)
 - GitOps: ArgoCD + Kustomize (Blockchain Node 배포)
 - Blockchain: Hyperledger Besu (Private Ethereum), QBFT Consensus, Blockscout
@@ -363,10 +363,10 @@
 
 ## 4. 프로젝트: IoT 태양광 발전 데이터 수집 플랫폼 (PoC)
 
-**기간**: 2023.08 ~ 2023.12
-**소속**: 비브릭
+**기간**: 2023.08 ~ 2023.12  
+**소속**: 비브릭  
 **역할**: Infrastructure Engineer  
-**기술 스택**:
+**기술 스택**:  
 - Infrastructure as Code: Terraform (AWS 전체 인프라 관리)
 - GitOps: ArgoCD + Kustomize (Kafka Ecosystem 배포)
 - Cloud & Infrastructure: AWS EKS, S3, Glue, Athena
@@ -438,10 +438,10 @@
 
 ## 5. 프로젝트: 경영 데이터 분석 플랫폼 'Hyper Report' 구축 및 GCP 이관
 
-**기간**: 2023.12 ~ 2024.12 (약 1년 운영)
-**소속**: 유클릭
+**기간**: 2023.12 ~ 2024.12 (약 1년 운영)  
+**소속**: 유클릭  
 **역할**: DevOps Engineer  
-**기술 스택**:
+**기술 스택**:  
 - Phase 1 (OCI): Terraform, ArgoCD + Kustomize, Chaos Mesh, KEDA, VPA, Goldilocks, Descheduler
 - Network: VPN Site-to-Site (Fortigate UTM ↔ OCI)
 - Container: OKE, Traefik IngressRoute, Tekton, Authentik
