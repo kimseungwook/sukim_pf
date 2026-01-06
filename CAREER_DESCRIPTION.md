@@ -17,8 +17,8 @@
 
 ## 1. 프로젝트: AI Agent 서비스 플랫폼 구축 및 국제 표준 인증 대응
 
-**기간**: 2022.12 ~ 2024.12 (진행 중)  
-**소속**: 유클릭(비브릭 회사 사정으로 인해 비브릭 업무를 유지하지만 유클릭에 소속)
+**기간**: 2022.12 ~ 2024.12
+**소속**: 유클릭
 **역할**: DevOps Engineer / Infrastructure Architect  
 **운영 규모**: 
 - Kubernetes: 30 Nodes, 30 Namespaces, 185 Workloads, 559 Pods
@@ -439,7 +439,7 @@
 ## 5. 프로젝트: 경영 데이터 분석 플랫폼 'Hyper Report' 구축 및 GCP 이관
 
 **기간**: 2023.12 ~ 2024.12 (약 1년 운영)
-**소속**: 유클릭(비브릭 회사 사정으로 인해 비브릭 업무를 유지하지만 유클릭에 소속)
+**소속**: 유클릭
 **역할**: DevOps Engineer  
 **기술 스택**:
 - Phase 1 (OCI): Terraform, ArgoCD + Kustomize, Chaos Mesh, KEDA, VPA, Goldilocks, Descheduler
