@@ -215,7 +215,7 @@
 
 **기간**: 2021.10 ~ 2022.12  
 **소속**: 비브릭  
-**역할**: DevOps Engineer  
+**역할**: DevOps Engineer / Infrastructure Architect   
 **기술 스택**:  
 - Infrastructure as Code: Terraform (AWS 전체 인프라 관리)
 - Cloud & Infrastructure: AWS (VPC, EC2, RDS, ECS Fargate, WorkSpaces, SSM)
@@ -288,7 +288,7 @@
 
 **기간**: 2022.12 ~ 2023.08  
 **소속**: 비브릭  
-**역할**: DevOps Engineer  
+**역할**: DevOps Engineer / Infrastructure Architect  
 **기술 스택**:  
 - Infrastructure as Code: Terraform (AWS 전체 인프라 관리)
 - GitOps: ArgoCD + Kustomize (Blockchain Node 배포)
@@ -365,7 +365,7 @@
 
 **기간**: 2023.08 ~ 2023.12  
 **소속**: 비브릭  
-**역할**: Infrastructure Engineer  
+**역할**: DevOps Engineer / Infrastructure Architect  
 **기술 스택**:  
 - Infrastructure as Code: Terraform (AWS 전체 인프라 관리)
 - GitOps: ArgoCD + Kustomize (Kafka Ecosystem 배포)
@@ -440,7 +440,7 @@
 
 **기간**: 2023.12 ~ 2024.12 (약 1년 운영)  
 **소속**: 유클릭  
-**역할**: DevOps Engineer  
+**역할**: DevOps Engineer / Infrastructure Architect  
 **기술 스택**:  
 - Phase 1 (OCI): Terraform, ArgoCD + Kustomize, Chaos Mesh, KEDA, VPA, Goldilocks, Descheduler
 - Network: VPN Site-to-Site (Fortigate UTM ↔ OCI)
