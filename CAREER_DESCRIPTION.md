@@ -17,9 +17,9 @@
 
 ## 1. 프로젝트: AI Agent 서비스 플랫폼 구축 및 국제 표준 인증 대응
 
-**기간**: 2022.12 ~ 2024.12
-**소속**: 유클릭
-**역할**: DevOps Engineer / Infrastructure Architect
+**기간**: 2022.12 ~ 2024.12  
+**소속**: 유클릭  
+**역할**: DevOps Engineer / Infrastructure Architect  
 **운영 규모**: 
 - Kubernetes: 30 Nodes, 30 Namespaces, 185 Workloads, 559 Pods
 - AI Infrastructure: On-Premise GPU Server (H100 8-GPU)
